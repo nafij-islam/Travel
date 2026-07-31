@@ -30,11 +30,11 @@ export const SmoothScroll: React.FC<SmoothScrollProps> = ({ children }) => {
 
     // 2. Initialize Lenis Smooth Scroll
     const lenis = new Lenis({
-      duration: 1.1,
+      duration: 0.9,
       easing: (t: number) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
-      smoothWheel: !isMobile, // Native touch scrolling on mobile for 100% responsiveness
+      smoothWheel: !isMobile,
       wheelMultiplier: 1.0,
-      touchMultiplier: 1.5,
+      touchMultiplier: 1.2,
     });
 
     lenisRef.current = lenis;
@@ -48,7 +48,7 @@ export const SmoothScroll: React.FC<SmoothScrollProps> = ({ children }) => {
     };
 
     gsap.ticker.add(tickerFn);
-    gsap.ticker.lagSmoothing(0);
+    gsap.ticker.lagSmoothing(500, 33);
 
     // Make lenis globally available for modal locking & back-to-top
     (window as any).__lenis = lenis;

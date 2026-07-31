@@ -11,6 +11,7 @@ interface ImageWithFallbackProps {
   width?: number;
   height?: number;
   sizes?: string;
+  priority?: boolean;
 }
 
 export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
@@ -20,7 +21,8 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   className = '',
   fill,
   width,
-  height
+  height,
+  priority = false
 }) => {
   const [imgSrc, setImgSrc] = useState<string>(src || fallbackSrc);
   const [hasError, setHasError] = useState(false);
@@ -37,8 +39,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       <img
         src={imgSrc}
         alt={alt}
+        loading={priority ? 'eager' : 'lazy'}
+        decoding="async"
         onError={handleError}
-        className={`absolute inset-0 w-full h-full object-cover ${className}`}
+        className={`absolute inset-0 w-full h-full object-cover transform-gpu ${className}`}
       />
     );
   }
@@ -49,8 +53,10 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
       alt={alt}
       width={width}
       height={height}
+      loading={priority ? 'eager' : 'lazy'}
+      decoding="async"
       onError={handleError}
-      className={`object-cover ${className}`}
+      className={`object-cover transform-gpu ${className}`}
     />
   );
 };

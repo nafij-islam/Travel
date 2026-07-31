@@ -252,14 +252,14 @@ export default function HomePage() {
             </div>
           </ScrollFadeUp>
 
-          <StaggerContainer className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          <StaggerContainer className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 transform-gpu">
             {PUBLIC_IMAGES.slice(0, 12).map((img, idx) => (
-              <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 group bg-slate-100">
+              <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-slate-200 dark:border-slate-800 group bg-slate-100 dark:bg-slate-800 transform-gpu">
                 <ImageWithFallback
                   src={img}
                   alt={`Bangladesh travel photo ${idx + 1}`}
                   fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="object-cover group-hover:scale-105 transition-transform duration-300 transform-gpu"
                 />
               </div>
             ))}
@@ -270,26 +270,26 @@ export default function HomePage() {
         <section className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
           <ScrollFadeUp className="flex items-center justify-between">
             <div>
-              <h2 className="text-xl font-bold text-slate-900 font-heading">Trending Destinations in Bangladesh</h2>
-              <p className="text-xs text-slate-500 mt-0.5">Top visited spots in Bangladesh</p>
+              <h2 className="text-xl font-bold text-slate-900 dark:text-white font-heading">Trending Destinations in Bangladesh</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Top visited spots in Bangladesh</p>
             </div>
             <Link href="/destinations" className="text-xs font-semibold text-brand-purple hover:underline">
               All Destinations →
             </Link>
           </ScrollFadeUp>
 
-          <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 transform-gpu">
             {MOCK_DESTINATIONS.map((dest) => (
               <Link
                 key={dest.id}
                 href={`/destinations/${dest.slug}`}
-                className="group relative rounded-xl overflow-hidden aspect-[4/3] border border-slate-200 shadow-sm hover:shadow-md transition-all bg-slate-100"
+                className="group relative rounded-xl overflow-hidden aspect-[4/3] border border-slate-200 dark:border-slate-800 shadow-sm hover:shadow-md transition-all bg-slate-100 dark:bg-slate-800 transform-gpu"
               >
                 <ImageWithFallback
                   src={dest.coverImage}
                   alt={`${dest.nameEn} travel guide and real trip cost`}
                   fill
-                  className="object-cover group-hover:scale-105 transition-transform duration-500"
+                  className="object-cover group-hover:scale-105 transition-transform duration-300 transform-gpu"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent p-4 flex flex-col justify-end text-white">
                   <span className="text-[9px] font-bold uppercase text-brand-cyan">{dest.district}</span>
