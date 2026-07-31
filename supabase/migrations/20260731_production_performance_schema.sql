@@ -7,6 +7,7 @@
 -- Enable Required Extensions
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
 -- --------------------------------------------------------------------
 -- 1. POSTGRESQL ENUMS & CONSTRAINED STATUS VALUES
@@ -459,12 +460,10 @@ CREATE TABLE IF NOT EXISTS public.audit_logs (
 -- 3. HIGH-PERFORMANCE INDEXES
 -- --------------------------------------------------------------------
 
--- GIN Full-Text Search Indexes
 CREATE INDEX IF NOT EXISTS idx_trips_fts ON public.trips USING GIN(fts);
 CREATE INDEX IF NOT EXISTS idx_destinations_fts ON public.destinations USING GIN(fts);
 CREATE INDEX IF NOT EXISTS idx_questions_fts ON public.questions USING GIN(fts);
 
--- Composite & Partial Indexes for Common Queries
 CREATE INDEX IF NOT EXISTS idx_trips_public_published ON public.trips(publication_status, visibility, published_at DESC);
 CREATE INDEX IF NOT EXISTS idx_trips_dest_budget ON public.trips(primary_destination_id, publication_status, total_cost);
 CREATE INDEX IF NOT EXISTS idx_trip_images_gallery ON public.trip_images(visibility, moderation_status, sort_order ASC);
@@ -521,7 +520,7 @@ JOIN public.profiles p ON p.id = img.uploaded_by
 LEFT JOIN public.destinations d ON d.id = t.primary_destination_id
 WHERE img.visibility = 'public' AND img.moderation_status = 'approved';
 
--- RPC Function: Full-Text Search across Trips & Destinations
+-- RPC Function: Full-Text Search
 CREATE OR REPLACE FUNCTION public.fn_search_trips_and_destinations(query_text TEXT)
 RETURNS TABLE (
     result_type TEXT,
@@ -560,7 +559,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql STABLE;
 
--- RPC Function: Super Admin Merge Duplicate Destinations
+-- RPC Function: Merge Duplicate Destinations
 CREATE OR REPLACE FUNCTION public.fn_merge_duplicate_destinations(
     primary_dest_id UUID,
     duplicate_dest_id UUID
@@ -574,56 +573,70 @@ BEGIN
         RAISE EXCEPTION 'Duplicate destination not found';
     END IF;
 
-    -- Add alias
     INSERT INTO public.destination_aliases (destination_id, alias)
     VALUES (primary_dest_id, duplicate_record.name_en)
     ON CONFLICT (alias) DO NOTHING;
 
-    -- Re-link all trips
     UPDATE public.trips
     SET primary_destination_id = primary_dest_id
     WHERE primary_destination_id = duplicate_dest_id;
 
-    -- Delete duplicate record
     DELETE FROM public.destinations WHERE id = duplicate_dest_id;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- --------------------------------------------------------------------
--- 5. AUTOMATED COUNTER TRIGGERS & FTS UPDATES
+-- 5. AUTOMATED SIGNUP & PROFILE TRIGGER
 -- --------------------------------------------------------------------
 
--- Maintain Full-Text Vectors
-CREATE OR REPLACE FUNCTION public.fn_maintain_fts() RETURNS TRIGGER AS $$
+CREATE OR REPLACE FUNCTION public.handle_new_user_registration()
+RETURNS TRIGGER AS $$
 BEGIN
-    IF TG_TABLE_NAME = 'trips' THEN
-        NEW.fts := to_tsvector('english', COALESCE(NEW.title, '') || ' ' || COALESCE(NEW.summary, '') || ' ' || COALESCE(NEW.start_location_text, ''));
-    ELSIF TG_TABLE_NAME = 'destinations' THEN
-        NEW.fts := to_tsvector('english', COALESCE(NEW.name_en, '') || ' ' || COALESCE(NEW.district, '') || ' ' || COALESCE(NEW.division, ''));
-    ELSIF TG_TABLE_NAME = 'questions' THEN
-        NEW.fts := to_tsvector('english', COALESCE(NEW.title, '') || ' ' || COALESCE(NEW.details, ''));
-    END IF;
+    -- 1. Insert Profile
+    INSERT INTO public.profiles (id, full_name, username, home_city)
+    VALUES (
+        NEW.id,
+        COALESCE(NEW.raw_user_meta_data->>'full_name', 'Traveler'),
+        COALESCE(NEW.raw_user_meta_data->>'username', 'traveler_' || SUBSTRING(NEW.id::text, 1, 8)),
+        COALESCE(NEW.raw_user_meta_data->>'home_city', 'Dhaka')
+    )
+    ON CONFLICT (id) DO NOTHING;
+
+    -- 2. Insert Default Traveler Role
+    INSERT INTO public.user_roles (user_id, role)
+    VALUES (NEW.id, 'traveler')
+    ON CONFLICT (user_id, role) DO NOTHING;
+
+    -- 3. Insert User Settings
+    INSERT INTO public.user_settings (user_id)
+    VALUES (NEW.id)
+    ON CONFLICT (user_id) DO NOTHING;
+
     RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
 
-DROP TRIGGER IF EXISTS trg_trips_fts ON public.trips;
-CREATE TRIGGER trg_trips_fts BEFORE INSERT OR UPDATE ON public.trips FOR EACH ROW EXECUTE FUNCTION public.fn_maintain_fts();
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+    AFTER INSERT ON auth.users
+    FOR EACH ROW EXECUTE FUNCTION public.handle_new_user_registration();
 
-DROP TRIGGER IF EXISTS trg_destinations_fts ON public.destinations;
-CREATE TRIGGER trg_destinations_fts BEFORE INSERT OR UPDATE ON public.destinations FOR EACH ROW EXECUTE FUNCTION public.fn_maintain_fts();
+-- --------------------------------------------------------------------
+-- 6. SEED INITIAL TRAVEL STYLES & DESTINATIONS
+-- --------------------------------------------------------------------
 
--- Real-time Counter Trigger
-CREATE OR REPLACE FUNCTION public.fn_update_user_trip_count() RETURNS TRIGGER AS $$
-BEGIN
-    IF TG_OP = 'INSERT' THEN
-        UPDATE public.profiles SET trips_count = trips_count + 1 WHERE id = NEW.author_id;
-    ELSIF TG_OP = 'DELETE' THEN
-        UPDATE public.profiles SET trips_count = GREATEST(0, trips_count - 1) WHERE id = OLD.author_id;
-    END IF;
-    RETURN NULL;
-END;
-$$ LANGUAGE plpgsql;
+INSERT INTO public.travel_styles (id, name_en, name_bn, slug, icon, description_en) VALUES
+(uuid_generate_v4(), 'Student Budget', 'স্টুডেন্ট বাজেট', 'student-budget', 'GraduationCap', 'Low cost trips optimized for students'),
+(uuid_generate_v4(), 'Family Holiday', 'ফ্যামিলি ট্যুর', 'family-holiday', 'Users', 'Comfortable family vacation plans'),
+(uuid_generate_v4(), 'Couple Getaway', 'কাপল ট্যুর', 'couple-getaway', 'Heart', 'Romantic & peaceful getaways'),
+(uuid_generate_v4(), 'Solo Adventure', 'একলা ভ্রমণ', 'solo-adventure', 'User', 'Independent solo exploration'),
+(uuid_generate_v4(), 'Friends Trip', 'বন্ধুদের ট্যুর', 'friends-trip', 'Smile', 'Group fun & adventure with friends')
+ON CONFLICT (slug) DO NOTHING;
 
-DROP TRIGGER IF EXISTS trg_user_trip_count ON public.trips;
-CREATE TRIGGER trg_user_trip_count AFTER INSERT OR DELETE ON public.trips FOR EACH ROW EXECUTE FUNCTION public.fn_update_user_trip_count();
+INSERT INTO public.destinations (id, name_en, name_bn, slug, district, division, cover_image, trip_count, avg_total_cost, avg_cost_per_person, avg_duration_days) VALUES
+(uuid_generate_v4(), 'Sajek Valley', 'সাজেক ভ্যালি', 'sajek-valley', 'Rangamati', 'Chittagong', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 48, 20800, 5200, 3),
+(uuid_generate_v4(), 'Cox''s Bazar', 'কক্সবাজার', 'coxs-bazar', 'Cox''s Bazar', 'Chittagong', 'https://images.unsplash.com/photo-1519046904884-53103b34b206?w=800', 120, 24000, 6000, 4),
+(uuid_generate_v4(), 'Sreemangal', 'শ্রীমঙ্গল', 'sreemangal', 'Moulvibazar', 'Sylhet', 'https://images.unsplash.com/photo-1544717305-2782549b5136?w=800', 35, 12000, 4000, 2),
+(uuid_generate_v4(), 'Sundarbans', 'সুন্দরবন', 'sundarbans', 'Bagerhat', 'Khulna', 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800', 19, 32000, 8000, 3),
+(uuid_generate_v4(), 'Saint Martin''s Island', 'সেন্টমার্টিন', 'saint-martins-island', 'Cox''s Bazar', 'Chittagong', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 64, 18000, 4500, 3)
+ON CONFLICT (slug) DO NOTHING;
