@@ -1,6 +1,5 @@
 import { createClient as createBrowserClient } from './client';
 import { Trip, TripImage, UserProfile, Destination, Question, Answer, ContentReport } from '@/lib/types';
-import { MOCK_TRIPS, MOCK_DESTINATIONS, MOCK_USERS, MOCK_QUESTIONS } from '@/lib/data/mockData';
 
 export const supabase = createBrowserClient();
 
@@ -26,10 +25,10 @@ export async function checkUserIsSuperAdmin(userId: string): Promise<boolean> {
 }
 
 /**
- * Fetch published trips from Supabase with fallback to mock data if empty.
+ * Fetch 100% live published trips from Supabase.
  */
 export async function getPublishedTrips(): Promise<Trip[]> {
-  if (!supabase) return MOCK_TRIPS;
+  if (!supabase) return [];
 
   try {
     const { data, error } = await supabase
@@ -48,34 +47,49 @@ export async function getPublishedTrips(): Promise<Trip[]> {
       .eq('visibility', 'public')
       .order('published_at', { ascending: false });
 
-    if (error || !data || data.length === 0) {
-      return MOCK_TRIPS;
+    if (error || !data) {
+      return [];
     }
 
-    return data.map((t: any) => ({
+    return data.map((t: any): Trip => ({
       id: t.id,
       authorId: t.author_id,
       author: t.author ? {
         id: t.author.id,
         fullName: t.author.full_name,
         username: t.author.username,
-        avatarUrl: t.author.avatar_url,
-        bio: t.author.bio,
-        homeCity: t.author.home_city,
-        preferredLanguage: t.author.preferred_language,
-        districtsVisitedCount: t.author.districts_visited_count,
-        tripsCount: t.author.trips_count,
-        helpfulVotesCount: t.author.helpful_votes_count,
-        followersCount: t.author.followers_count,
-        followingCount: t.author.following_count,
-        isVerified: t.author.is_verified,
+        avatarUrl: t.author.avatar_url || '',
+        bio: t.author.bio || '',
+        homeCity: t.author.home_city || 'Bangladesh',
+        preferredLanguage: t.author.preferred_language || 'en',
+        districtsVisitedCount: t.author.districts_visited_count || 0,
+        tripsCount: t.author.trips_count || 0,
+        helpfulVotesCount: t.author.helpful_votes_count || 0,
+        followersCount: t.author.followers_count || 0,
+        followingCount: t.author.following_count || 0,
+        isVerified: t.author.is_verified || false,
         createdAt: t.author.created_at
-      } : MOCK_USERS[0],
+      } : {
+        id: 'anon',
+        fullName: 'Traveler',
+        username: 'traveler',
+        avatarUrl: '',
+        bio: '',
+        homeCity: 'Bangladesh',
+        preferredLanguage: 'en',
+        districtsVisitedCount: 0,
+        tripsCount: 0,
+        helpfulVotesCount: 0,
+        followersCount: 0,
+        followingCount: 0,
+        isVerified: false,
+        createdAt: t.created_at
+      },
       title: t.title,
       slug: t.slug,
       summary: t.summary || '',
       contentLanguage: t.content_language || 'en',
-      startLocationText: t.start_location_text,
+      startLocationText: t.start_location_text || 'Dhaka',
       destination: t.destination ? {
         id: t.destination.id,
         nameEn: t.destination.name_en,
@@ -84,21 +98,34 @@ export async function getPublishedTrips(): Promise<Trip[]> {
         district: t.destination.district,
         division: t.destination.division,
         coverImage: t.destination.cover_image,
-        tripCount: t.destination.trip_count,
-        avgTotalCost: t.destination.avg_total_cost,
-        avgCostPerPerson: t.destination.avg_cost_per_person,
-        avgDurationDays: t.destination.avg_duration_days,
-        isVerified: t.destination.is_verified
-      } : MOCK_DESTINATIONS[0],
+        tripCount: t.destination.trip_count || 0,
+        avgTotalCost: t.destination.avg_total_cost || 0,
+        avgCostPerPerson: t.destination.avg_cost_per_person || 0,
+        avgDurationDays: t.destination.avg_duration_days || 0,
+        isVerified: t.destination.is_verified || false
+      } : {
+        id: 'dest',
+        nameEn: t.destination_slug || 'Bangladesh',
+        nameBn: t.destination_slug || 'বাংলাদেশ',
+        slug: t.destination_slug || 'bangladesh',
+        district: 'Bangladesh',
+        division: 'Bangladesh',
+        coverImage: t.cover_image_path || '',
+        tripCount: 1,
+        avgTotalCost: t.total_cost,
+        avgCostPerPerson: t.cost_per_person,
+        avgDurationDays: t.duration_days,
+        isVerified: true
+      },
       startDate: t.start_date,
       endDate: t.end_date,
       durationDays: t.duration_days,
       travelerCount: t.traveler_count,
       travelStyle: {
-        id: 'style-1',
-        nameEn: t.travel_style_slug ? t.travel_style_slug.replace('-', ' ') : 'Student Budget',
-        nameBn: 'বাজেট',
-        slug: t.travel_style_slug || 'student-budget',
+        id: 'style',
+        nameEn: t.travel_style_slug ? t.travel_style_slug.replace('-', ' ') : 'Budget Trip',
+        nameBn: 'বাজেট ভ্রমণ',
+        slug: t.travel_style_slug || 'budget-trip',
         icon: 'Wallet',
         descriptionEn: 'Budget trip'
       },
@@ -139,34 +166,114 @@ export async function getPublishedTrips(): Promise<Trip[]> {
       recommendations: {
         recommendedFor: [],
         whatToCarry: [],
-        bestTime: 'October to March',
+        bestTime: '',
         costSavingTips: []
       },
       costConfirmations: {
-        stillAccurate: 12,
-        slightlyHigher: 2,
+        stillAccurate: 1,
+        slightlyHigher: 0,
         muchHigher: 0,
-        lowerPossible: 1,
-        lastConfirmedDate: '2026-07-20'
+        lowerPossible: 0,
+        lastConfirmedDate: t.published_at || t.created_at
       },
-      visibility: t.visibility,
+      verificationStatus: t.verification_status || 'unverified',
       publicationStatus: t.publication_status,
-      verificationStatus: t.verification_status,
-      publishedAt: t.published_at,
-      lastCostUpdatedAt: t.last_cost_updated_at,
-      viewCount: t.view_count || 0,
-      saveCount: t.save_count || 0,
-      copyCount: t.copy_count || 0,
-      questionCount: t.question_count || 0
+      visibility: t.visibility,
+      viewCount: t.views_count || 0,
+      saveCount: t.saves_count || 0,
+      copyCount: t.copies_count || 0,
+      questionCount: 0,
+      publishedAt: t.published_at || t.created_at,
+      lastCostUpdatedAt: t.published_at || t.created_at
     }));
   } catch (err) {
-    console.error('Error fetching trips from Supabase:', err);
-    return MOCK_TRIPS;
+    console.error('Error fetching published trips from Supabase:', err);
+    return [];
   }
 }
 
 /**
- * Persist new trip post to Supabase database.
+ * Fetch 100% live popular destinations from Supabase.
+ */
+export async function getPopularDestinations(): Promise<Destination[]> {
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('destinations')
+      .select('*')
+      .order('trip_count', { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map((d: any) => ({
+      id: d.id,
+      nameEn: d.name_en,
+      nameBn: d.name_bn,
+      slug: d.slug,
+      district: d.district,
+      division: d.division,
+      coverImage: d.cover_image,
+      tripCount: d.trip_count || 0,
+      avgTotalCost: d.avg_total_cost || 0,
+      avgCostPerPerson: d.avg_cost_per_person || 0,
+      avgDurationDays: d.avg_duration_days || 0,
+      isVerified: d.is_verified || false
+    }));
+  } catch (err) {
+    console.error('Error fetching popular destinations:', err);
+    return [];
+  }
+}
+
+/**
+ * Fetch 100% live approved public gallery photos from `vw_public_gallery` view.
+ */
+export async function getPublicGalleryImages(): Promise<TripImage[]> {
+  if (!supabase) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from('vw_public_gallery')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error || !data) return [];
+
+    return data.map((img: any) => ({
+      id: img.id,
+      tripId: img.trip_id,
+      uploadedBy: img.uploaded_by,
+      storagePath: img.storage_path,
+      originalFilename: img.original_filename,
+      caption: img.caption,
+      altText: img.alt_text,
+      isCover: img.is_cover,
+      sortOrder: img.sort_order,
+      visibility: 'public' as const,
+      moderationStatus: 'approved' as const,
+      fileSize: img.file_size || 300000,
+      width: img.width || 1920,
+      height: img.height || 1080,
+      createdAt: img.created_at,
+      updatedAt: img.created_at,
+      previewUrl: img.storage_path,
+      uploaderName: img.uploader_name,
+      uploaderAvatar: img.uploader_avatar,
+      destinationName: img.destination_name,
+      tripTitle: img.trip_title,
+      tripSlug: img.trip_slug,
+      tripDate: '2026',
+      travelStyleSlug: img.travel_style_slug
+    }));
+  } catch (err) {
+    console.error('Error fetching public gallery images:', err);
+    return [];
+  }
+}
+
+/**
+ * Create a new trip in Supabase.
  */
 export async function createTripInSupabase(
   tripData: any,
@@ -174,30 +281,30 @@ export async function createTripInSupabase(
   uploadedImageItems: any[] = []
 ): Promise<{ success: boolean; tripId?: string; error?: string }> {
   if (!supabase) {
-    return { success: true, tripId: `mock_${Date.now()}` };
+    return { success: false, error: 'Supabase client is not available.' };
   }
 
   try {
-    const slug = `${tripData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${Date.now().toString(36)}`;
-    const destSlug = tripData.destinationSlug || 'custom-destination';
-    const destName = tripData.destinationInputText || tripData.destinationSlug || 'Custom Location';
+    const destName = tripData.destinationInputText || 'Sajek Valley';
+    const destSlug = destName.toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
+    const slug = `${destSlug}-${Date.now()}`;
 
-    // 0. Dynamic Destination Verification / Creation
+    // Find destination or create custom location
     let destId = null;
     const { data: existingDest } = await supabase
       .from('destinations')
       .select('id')
-      .eq('slug', destSlug)
+      .ilike('name_en', destName)
       .single();
 
     if (existingDest) {
       destId = existingDest.id;
     } else {
-      // Create new pending destination entry
       const { data: newDest } = await supabase
         .from('destinations')
         .insert({
           name_en: destName,
+          name_bn: destName,
           slug: destSlug,
           district: 'Bangladesh',
           division: 'Bangladesh',
@@ -295,8 +402,8 @@ export async function createTripInSupabase(
       await supabase.from('trip_images').insert(
         uploadedImageItems.map((img: any, idx: number) => ({
           trip_id: tripId,
-          uploaded_by: authorId,
-          storage_path: img.previewUrl || `trip-images/${authorId}/${tripId}/${img.originalFilename}`,
+          uploaded_by: validAuthorId,
+          storage_path: img.previewUrl || `trip-images/${validAuthorId}/${tripId}/${img.originalFilename}`,
           original_filename: img.originalFilename || `image_${idx}.webp`,
           caption: img.caption || '',
           alt_text: img.altText || '',

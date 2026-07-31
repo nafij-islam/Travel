@@ -1,49 +1,28 @@
-import React from 'react';
-import { Metadata } from 'next';
-import { GalleryGrid } from '@/components/gallery/GalleryGrid';
-import { MOCK_TRIPS } from '@/lib/data/mockData';
-import { TripImage } from '@/lib/types';
-import { Camera, Sparkles } from 'lucide-react';
+'use client';
 
-export const metadata: Metadata = {
-  title: 'Travel Photo Gallery — Real Bangladesh Trips',
-  description: 'Explore crowd-sourced travel photos, real trip costs, scenic landscapes, and authentic itinerary snapshots across Bangladesh.'
-};
+import React, { useState, useEffect } from 'react';
+import { GalleryGrid } from '@/components/gallery/GalleryGrid';
+import { getPublicGalleryImages } from '@/lib/supabase/supabase';
+import { TripImage } from '@/lib/types';
+import { Camera } from 'lucide-react';
 
 export default function PublicGalleryPage() {
-  // Aggregate all trip images across mock trips
-  const allImages: TripImage[] = MOCK_TRIPS.flatMap((trip) => {
-    if (trip.tripImages && trip.tripImages.length > 0) {
-      return trip.tripImages;
+  const [images, setImages] = useState<TripImage[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadGallery() {
+      try {
+        const liveImages = await getPublicGalleryImages();
+        setImages(liveImages);
+      } catch (err) {
+        console.error('Error loading gallery photos:', err);
+      } finally {
+        setLoading(false);
+      }
     }
-    // Fallback for legacy trips
-    return trip.images.map((imgUrl, idx) => ({
-      id: `img_${trip.id}_${idx}`,
-      tripId: trip.id,
-      uploadedBy: trip.authorId,
-      storagePath: imgUrl,
-      originalFilename: `photo_${idx + 1}.jpg`,
-      caption: idx === 0 ? `${trip.title} cover photo` : `Snapshot from ${trip.destination.nameEn}`,
-      altText: trip.destination.nameEn,
-      isCover: idx === 0,
-      sortOrder: idx,
-      visibility: 'public' as const,
-      moderationStatus: 'approved' as const,
-      fileSize: 450000,
-      width: 1920,
-      height: 1080,
-      createdAt: trip.publishedAt,
-      updatedAt: trip.publishedAt,
-      previewUrl: imgUrl,
-      uploaderName: trip.author.fullName,
-      uploaderAvatar: trip.author.avatarUrl,
-      destinationName: trip.destination.nameEn,
-      tripTitle: trip.title,
-      tripSlug: trip.slug,
-      tripDate: '2026',
-      travelStyleSlug: trip.travelStyle.slug
-    }));
-  });
+    loadGallery();
+  }, []);
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -54,17 +33,21 @@ export default function PublicGalleryPage() {
           <span>Real Traveler Snapshots</span>
         </div>
 
-        <h1 className="text-3xl sm:text-5xl font-black text-slate-900 font-heading">
+        <h1 className="text-3xl sm:text-5xl font-black text-slate-900 dark:text-white font-heading">
           Explore Bangladesh <span className="text-brand-purple">Travel Gallery</span>
         </h1>
 
-        <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
-          Discover authentic community photos, scenic Sajek sea of clouds, Cox's Bazar sunsets, and tea garden trails shared by verified travelers.
+        <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+          Discover authentic community photos, scenic landscapes, and authentic itinerary snapshots shared by verified travelers.
         </p>
       </div>
 
       {/* Gallery Grid & Lightbox Container */}
-      <GalleryGrid images={allImages} />
+      {loading ? (
+        <div className="text-center py-16 text-xs text-slate-400">Loading travel gallery...</div>
+      ) : (
+        <GalleryGrid images={images} />
+      )}
     </div>
   );
 }

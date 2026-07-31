@@ -1,8 +1,8 @@
 import { MetadataRoute } from 'next';
 import { SITE_CONFIG } from '@/lib/seo/siteConfig';
-import { MOCK_TRIPS, MOCK_DESTINATIONS, MOCK_QUESTIONS, MOCK_USERS } from '@/lib/data/mockData';
+import { getPublishedTrips, getPopularDestinations } from '@/lib/supabase/supabase';
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = SITE_CONFIG.domain;
   const now = new Date().toISOString();
 
@@ -11,28 +11,39 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: `${baseUrl}/`, lastModified: now, changeFrequency: 'daily', priority: 1.0 },
     { url: `${baseUrl}/trips`, lastModified: now, changeFrequency: 'daily', priority: 0.9 },
     { url: `${baseUrl}/destinations`, lastModified: now, changeFrequency: 'weekly', priority: 0.9 },
+    { url: `${baseUrl}/gallery`, lastModified: now, changeFrequency: 'daily', priority: 0.85 },
     { url: `${baseUrl}/budget-trips`, lastModified: now, changeFrequency: 'weekly', priority: 0.8 },
     { url: `${baseUrl}/questions`, lastModified: now, changeFrequency: 'daily', priority: 0.8 },
     { url: `${baseUrl}/challenges`, lastModified: now, changeFrequency: 'monthly', priority: 0.6 },
   ];
 
-  // Published Quality-Gated Trips
-  const tripRoutes: MetadataRoute.Sitemap = MOCK_TRIPS.filter(
-    (t) => t.publicationStatus === 'published' && t.visibility === 'public'
-  ).map((trip) => ({
-    url: `${baseUrl}/trips/${trip.slug}`,
-    lastModified: trip.lastCostUpdatedAt || trip.publishedAt || now,
-    changeFrequency: 'weekly',
-    priority: 0.8,
-  }));
+  // Fetch Published Quality-Gated Trips from Supabase
+  let tripRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const publishedTrips = await getPublishedTrips();
+    tripRoutes = publishedTrips.map((trip) => ({
+      url: `${baseUrl}/trips/${trip.slug}`,
+      lastModified: trip.publishedAt || now,
+      changeFrequency: 'weekly',
+      priority: 0.8,
+    }));
+  } catch (err) {
+    console.error('Error generating trip sitemap routes:', err);
+  }
 
-  // Destination Guides
-  const destinationRoutes: MetadataRoute.Sitemap = MOCK_DESTINATIONS.map((dest) => ({
-    url: `${baseUrl}/destinations/${dest.slug}`,
-    lastModified: now,
-    changeFrequency: 'weekly',
-    priority: 0.85,
-  }));
+  // Destination Guides from Supabase
+  let destinationRoutes: MetadataRoute.Sitemap = [];
+  try {
+    const destinations = await getPopularDestinations();
+    destinationRoutes = destinations.map((dest) => ({
+      url: `${baseUrl}/destinations/${dest.slug}`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.85,
+    }));
+  } catch (err) {
+    console.error('Error generating destination sitemap routes:', err);
+  }
 
   // Curated Origin-to-Destination Routes
   const routeSlugs = [
@@ -57,29 +68,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.75,
   }));
 
-  // Community Questions
-  const questionRoutes: MetadataRoute.Sitemap = MOCK_QUESTIONS.map((q) => ({
-    url: `${baseUrl}/questions/${q.slug}`,
-    lastModified: q.createdAt,
-    changeFrequency: 'weekly',
-    priority: 0.7,
-  }));
-
-  // Public Traveler Profiles
-  const profileRoutes: MetadataRoute.Sitemap = MOCK_USERS.map((user) => ({
-    url: `${baseUrl}/travelers/${user.username}`,
-    lastModified: now,
-    changeFrequency: 'monthly',
-    priority: 0.6,
-  }));
-
   return [
     ...staticRoutes,
     ...tripRoutes,
     ...destinationRoutes,
     ...originRouteEntries,
-    ...budgetRoutes,
-    ...questionRoutes,
-    ...profileRoutes,
+    ...budgetRoutes
   ];
 }
