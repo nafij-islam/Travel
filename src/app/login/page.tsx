@@ -41,9 +41,12 @@ export default function LoginPage() {
         return;
       }
 
-      if (data.session) {
+      if (data?.session) {
         router.push(redirectPath);
         router.refresh();
+      } else {
+        setErrorMessage('Account not found or email verification pending. Please sign up or verify your email.');
+        setLoading(false);
       }
     } catch (err) {
       setErrorMessage((err as Error).message || 'Failed to sign in');
