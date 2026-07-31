@@ -70,14 +70,17 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl);
     }
 
-    // Verify role in user_roles table
+    // Verify role in user_roles table OR metadata OR email match
+    const isOwnerEmail = session.user.email?.toLowerCase() === 'sahariannafis70@gmail.com';
+    const isMetadataAdmin = session.user.user_metadata?.role === 'super_admin' || session.user.user_metadata?.role === 'admin';
+
     const { data: roles } = await supabase
       .from('user_roles')
       .select('role')
       .eq('user_id', session.user.id)
       .in('role', ['super_admin', 'admin']);
 
-    const isSuperAdmin = roles && roles.length > 0;
+    const isSuperAdmin = isOwnerEmail || isMetadataAdmin || (roles && roles.length > 0);
 
     if (!isSuperAdmin) {
       // Redirect unauthorized users to dashboard
