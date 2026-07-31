@@ -22,6 +22,7 @@ export const Footer: React.FC = () => {
                   src="/images/logo.png"
                   fallbackSrc="/logo.png"
                   alt="Ghurabo"
+                  transparentBg
                   className="h-14 w-auto object-contain"
                 />
               </div>
