@@ -259,6 +259,9 @@ export default function HomePage() {
                   src={img}
                   alt={`Bangladesh travel photo ${idx + 1}`}
                   fill
+                  preset="galleryThumbnail"
+                  priority={idx < 2}
+                  sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 16vw"
                   className="object-cover group-hover:scale-105 transition-transform duration-300 transform-gpu"
                 />
               </div>
@@ -279,7 +282,7 @@ export default function HomePage() {
           </ScrollFadeUp>
 
           <StaggerContainer className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5 transform-gpu">
-            {MOCK_DESTINATIONS.map((dest) => (
+            {MOCK_DESTINATIONS.map((dest, idx) => (
               <Link
                 key={dest.id}
                 href={`/destinations/${dest.slug}`}
@@ -289,6 +292,9 @@ export default function HomePage() {
                   src={dest.coverImage}
                   alt={`${dest.nameEn} travel guide and real trip cost`}
                   fill
+                  preset="destinationCard"
+                  priority={idx < 2}
+                  sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 25vw"
                   className="object-cover group-hover:scale-105 transition-transform duration-300 transform-gpu"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent p-4 flex flex-col justify-end text-white">

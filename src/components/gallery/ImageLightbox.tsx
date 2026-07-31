@@ -17,6 +17,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { TripImage } from '@/lib/types';
+import { ImageWithFallback } from '@/components/common/ImageWithFallback';
 
 interface ImageLightboxProps {
   image: TripImage | null;
@@ -154,9 +155,12 @@ export function ImageLightbox({
           </button>
         )}
 
-        <img
+        <ImageWithFallback
           src={image.previewUrl || `https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800`}
           alt={image.altText || image.caption || 'Ghurabo Travel Photo'}
+          preset="lightboxPreview"
+          priority={true}
+          sizes="100vw"
           className="max-h-[75vh] max-w-full object-contain rounded-xl shadow-2xl transition-all duration-300"
         />
 

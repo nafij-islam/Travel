@@ -181,3 +181,21 @@ export async function processAndOptimizeImage(
     reader.readAsDataURL(file);
   });
 }
+
+/**
+ * Generates separate Thumbnail (400x400), Card (640x420), and High-Res Preview (max 1600px) WebP variants.
+ */
+export async function createImageVariants(file: File): Promise<{
+  thumbnail: ProcessedImageResult;
+  card: ProcessedImageResult;
+  preview: ProcessedImageResult;
+}> {
+  const [thumbnail, card, preview] = await Promise.all([
+    processAndOptimizeImage(file, 400, 400, 0.75),
+    processAndOptimizeImage(file, 640, 420, 0.75),
+    processAndOptimizeImage(file, 1600, 1600, 0.80)
+  ]);
+
+  return { thumbnail, card, preview };
+}
+
