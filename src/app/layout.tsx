@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { Suspense } from 'react';
 import { Manrope, Inter, Noto_Sans_Bengali } from 'next/font/google';
 import { LanguageProvider } from '@/lib/i18n/LanguageContext';
+import { ThemeProvider } from '@/context/ThemeContext';
 import { Header } from '@/components/layout/Header';
 import { MobileNav } from '@/components/layout/MobileNav';
 import { Footer } from '@/components/layout/Footer';
@@ -86,19 +87,36 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={`${manrope.variable} ${inter.variable} ${notoSansBengali.variable}`}>
-      <body className="min-h-screen flex flex-col font-sans antialiased selection:bg-brand-purple selection:text-white">
-        <LanguageProvider>
-          <Suspense fallback={null}>
-            <SmoothScroll>
-              <Header />
-              <main className="flex-1">{children}</main>
-              <Footer />
-              <MobileNav />
-              <BackToTop />
-            </SmoothScroll>
-          </Suspense>
-        </LanguageProvider>
+    <html lang="en" className={`${manrope.variable} ${inter.variable} ${notoSansBengali.variable}`} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var saved = localStorage.getItem('ghurabo_theme') || 'system';
+                  var isDark = saved === 'dark' || (saved === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  if (isDark) document.documentElement.classList.add('dark');
+                } catch (e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
+      <body className="min-h-screen flex flex-col font-sans antialiased bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 selection:bg-brand-purple selection:text-white transition-colors duration-150">
+        <ThemeProvider>
+          <LanguageProvider>
+            <Suspense fallback={null}>
+              <SmoothScroll>
+                <Header />
+                <main className="flex-1">{children}</main>
+                <Footer />
+                <MobileNav />
+                <BackToTop />
+              </SmoothScroll>
+            </Suspense>
+          </LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

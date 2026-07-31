@@ -640,3 +640,34 @@ INSERT INTO public.destinations (id, name_en, name_bn, slug, district, division,
 (uuid_generate_v4(), 'Sundarbans', 'সুন্দরবন', 'sundarbans', 'Bagerhat', 'Khulna', 'https://images.unsplash.com/photo-1448375240586-882707db888b?w=800', 19, 32000, 8000, 3),
 (uuid_generate_v4(), 'Saint Martin''s Island', 'সেন্টমার্টিন', 'saint-martins-island', 'Cox''s Bazar', 'Chittagong', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=800', 64, 18000, 4500, 3)
 ON CONFLICT (slug) DO NOTHING;
+
+-- --------------------------------------------------------------------
+-- 7. STORAGE BUCKETS & STORAGE POLICIES
+-- --------------------------------------------------------------------
+
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('avatars', 'avatars', true)
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO storage.buckets (id, name, public) 
+VALUES ('trip-images', 'trip-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Avatars Storage Policy: Public Read Access
+CREATE POLICY "Public Read Avatars" ON storage.objects
+    FOR SELECT USING (bucket_id = 'avatars');
+
+-- Avatars Storage Policy: Authenticated User Upload to own folder
+CREATE POLICY "User Avatar Upload" ON storage.objects
+    FOR INSERT WITH CHECK (
+        bucket_id = 'avatars' AND 
+        auth.uid()::text = (storage.foldername(name))[2]
+    );
+
+-- Avatars Storage Policy: Authenticated User Update/Delete own folder
+CREATE POLICY "User Avatar Modify" ON storage.objects
+    FOR UPDATE USING (
+        bucket_id = 'avatars' AND 
+        auth.uid()::text = (storage.foldername(name))[2]
+    );
+
