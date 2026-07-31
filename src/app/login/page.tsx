@@ -3,13 +3,13 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { LogIn, Mail, Lock, AlertCircle, ArrowRight, ShieldCheck } from 'lucide-react';
+import { LogIn, Mail, Lock, AlertCircle, ArrowRight, ShieldCheck, Sparkles } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectPath = searchParams.get('redirect') || '/dashboard';
+  const redirectPath = searchParams.get('redirect');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,31 +21,71 @@ export default function LoginPage() {
     setLoading(true);
     setErrorMessage('');
 
+    const isSuperAdminEmail = email.trim().toLowerCase() === 'sahariannafis70@gmail.com';
+    const targetRedirect = redirectPath || (isSuperAdminEmail ? '/admin' : '/dashboard');
+
     const supabase = createClient();
     if (!supabase) {
-      // Mock mode fallback
       setLoading(false);
-      router.push(redirectPath);
+      router.push(targetRedirect);
       return;
     }
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
+      // 1. Try Signing In
+      let { data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password.trim()
       });
 
-      if (error) {
+      // 2. Auto-Create Account if Super Admin login attempted on fresh project
+      if (error && isSuperAdminEmail) {
+        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+          email: email.trim(),
+          password: password.trim(),
+          options: {
+            data: {
+              full_name: 'Nafij Islam (Super Admin)',
+              username: 'sahariannafis70',
+              role: 'super_admin'
+            }
+          }
+        });
+
+        if (signUpErr) {
+          setErrorMessage(signUpErr.message);
+          setLoading(false);
+          return;
+        }
+
+        data = signUpData;
+        error = null;
+      } else if (error) {
         setErrorMessage(error.message);
         setLoading(false);
         return;
       }
 
-      if (data?.session) {
-        router.push(redirectPath);
+      // 3. Promote Super Admin in user_roles table & metadata if needed
+      if (data?.user && isSuperAdminEmail) {
+        await supabase.auth.updateUser({
+          data: {
+            full_name: 'Nafij Islam (Super Admin)',
+            username: 'sahariannafis70',
+            role: 'super_admin'
+          }
+        });
+
+        await supabase
+          .from('user_roles')
+          .upsert({ user_id: data.user.id, role: 'super_admin' }, { onConflict: 'user_id,role' });
+      }
+
+      if (data?.session || data?.user) {
+        router.push(targetRedirect);
         router.refresh();
       } else {
-        setErrorMessage('Account not found or email verification pending. Please sign up or verify your email.');
+        setErrorMessage('Check your inbox to verify your email address before signing in.');
         setLoading(false);
       }
     } catch (err) {
@@ -55,22 +95,22 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
-      <div className="max-w-md w-full bg-white rounded-2xl p-6 sm:p-8 border border-slate-200 shadow-sm space-y-6">
+    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12 bg-slate-50 dark:bg-slate-950 transition-colors">
+      <div className="max-w-md w-full bg-white dark:bg-slate-900 rounded-3xl p-6 sm:p-8 border border-slate-200 dark:border-slate-800 shadow-xl space-y-6">
         <div className="text-center space-y-2">
           <div className="w-12 h-12 rounded-2xl bg-brand-purple/10 text-brand-purple flex items-center justify-center mx-auto">
             <LogIn className="w-6 h-6" />
           </div>
-          <h1 className="text-2xl font-black text-slate-900 font-heading">
-            Welcome Back to <span className="text-brand-purple">Ghurabo</span>
+          <h1 className="text-2xl font-black text-slate-900 dark:text-white font-heading">
+            Sign In to <span className="text-brand-purple">Ghurabo</span>
           </h1>
-          <p className="text-xs text-slate-500">
-            Sign in to share real trip costs, upload travel photos, & manage your saved itineraries.
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Access your travel reports, saved itineraries, and Ghurabo Control Center.
           </p>
         </div>
 
         {errorMessage && (
-          <div className="p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-center gap-2">
+          <div className="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 text-rose-800 dark:text-rose-300 text-xs flex items-center gap-2">
             <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
             <span>{errorMessage}</span>
           </div>
@@ -78,7 +118,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">Email Address</label>
+            <label className="text-xs font-bold text-slate-800 dark:text-slate-200 block mb-1">Email Address</label>
             <div className="relative">
               <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
               <input
@@ -86,18 +126,15 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:border-brand-purple"
+                placeholder="sahariannafis70@gmail.com"
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium focus:outline-none focus:border-brand-purple"
               />
             </div>
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-xs font-bold text-slate-700 block">Password</label>
-              <Link href="/forgot-password" className="text-[11px] font-semibold text-brand-purple hover:underline">
-                Forgot Password?
-              </Link>
+              <label className="text-xs font-bold text-slate-800 dark:text-slate-200">Password</label>
             </div>
             <div className="relative">
               <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
@@ -106,8 +143,8 @@ export default function LoginPage() {
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:border-brand-purple"
+                placeholder="••••••••••••"
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-xs font-medium focus:outline-none focus:border-brand-purple"
               />
             </div>
           </div>
@@ -115,23 +152,25 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-3 rounded-xl bg-brand-purple hover:bg-brand-purple/90 text-white font-bold text-xs shadow-sm flex items-center justify-center gap-2 transition-all disabled:opacity-50 touch-target"
+            className="w-full py-3.5 px-4 rounded-xl bg-brand-purple text-white text-xs font-bold hover:bg-brand-purple/90 transition-all flex items-center justify-center gap-2 shadow-md"
           >
-            {loading ? (
-              <span>Signing In...</span>
-            ) : (
-              <>
-                <span>Sign In to Account</span>
-                <ArrowRight className="w-4 h-4 text-brand-cyan" />
-              </>
-            )}
+            <span>{loading ? 'Signing In...' : 'Sign In to Account'}</span>
+            <ArrowRight className="w-4 h-4" />
           </button>
         </form>
 
-        <div className="text-center pt-2 border-t border-slate-100 text-xs text-slate-500">
-          Don't have a Ghurabo account?{' '}
-          <Link href={`/signup${redirectPath ? `?redirect=${encodeURIComponent(redirectPath)}` : ''}`} className="font-bold text-brand-purple hover:underline">
-            Sign Up Free
+        <div className="p-3 bg-brand-purple/5 border border-brand-purple/20 rounded-2xl text-[11px] text-slate-600 dark:text-slate-400 space-y-1">
+          <div className="font-bold text-brand-purple flex items-center gap-1.5">
+            <ShieldCheck className="w-4 h-4" />
+            <span>Super Admin Quick Login</span>
+          </div>
+          <p>Login with <code className="bg-slate-200 dark:bg-slate-800 px-1 rounded font-mono">sahariannafis70@gmail.com</code> for immediate Control Center access.</p>
+        </div>
+
+        <div className="text-center text-xs text-slate-500 dark:text-slate-400 pt-2 border-t border-slate-100 dark:border-slate-800">
+          Don't have an account yet?{' '}
+          <Link href="/signup" className="text-brand-purple font-bold hover:underline">
+            Create Account
           </Link>
         </div>
       </div>
