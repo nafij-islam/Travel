@@ -45,6 +45,7 @@ export async function getPublishedTrips(): Promise<Trip[]> {
       `)
       .eq('publication_status', 'published')
       .eq('visibility', 'public')
+      .eq('is_deleted', false)
       .order('published_at', { ascending: false });
 
     if (error || !data) {
@@ -344,7 +345,8 @@ export async function createTripInSupabase(
         cover_image_path: uploadedImageItems.find((i) => i.isCover)?.previewUrl || '/images/sajek_cloud_valley.png',
         visibility: 'public',
         publication_status: 'pending_review',
-        verification_status: 'unverified'
+        verification_status: 'unverified',
+        is_deleted: false
       })
       .select()
       .single();
@@ -422,6 +424,194 @@ export async function createTripInSupabase(
   } catch (err) {
     console.error('Error creating trip in Supabase:', err);
     return { success: false, error: (err as Error).message };
+  }
+}
+
+/**
+ * Super Admin Action: APPROVE TRIP
+ */
+export async function approveTripInSupabase(tripId: string, adminId: string, authorId: string, tripTitle: string): Promise<boolean> {
+  if (!supabase) return false;
+
+  try {
+    const now = new Date().toISOString();
+    // 1. Update trip status
+    const { error: updateErr } = await supabase
+      .from('trips')
+      .update({
+        publication_status: 'published',
+        approved_by: adminId,
+        approved_at: now,
+        published_at: now
+      })
+      .eq('id', tripId);
+
+    if (updateErr) throw updateErr;
+
+    // 2. Insert User Notification for Traveler
+    await supabase.from('user_notifications').insert({
+      user_id: authorId,
+      title: '🎉 Your Trip Report is Published!',
+      message: `Great news! Your trip report "${tripTitle}" has been approved by Super Admin and is now live on Ghurabo.`,
+      type: 'trip_approval',
+      link: `/trips`
+    });
+
+    // 3. Insert Audit Log
+    await supabase.from('audit_logs').insert({
+      actor_id: adminId,
+      action: 'APPROVE_TRIP',
+      target_table: 'trips',
+      target_id: tripId,
+      details: { title: tripTitle, status: 'published' }
+    });
+
+    return true;
+  } catch (err) {
+    console.error('Error approving trip in Supabase:', err);
+    return false;
+  }
+}
+
+/**
+ * Super Admin Action: REJECT TRIP WITH REASON
+ */
+export async function rejectTripInSupabase(tripId: string, adminId: string, authorId: string, tripTitle: string, reason: string): Promise<boolean> {
+  if (!supabase) return false;
+
+  try {
+    const now = new Date().toISOString();
+    // 1. Update trip status to rejected
+    const { error: updateErr } = await supabase
+      .from('trips')
+      .update({
+        publication_status: 'rejected',
+        rejected_by: adminId,
+        rejected_at: now,
+        rejection_reason: reason
+      })
+      .eq('id', tripId);
+
+    if (updateErr) throw updateErr;
+
+    // 2. Insert User Notification with Rejection Reason
+    await supabase.from('user_notifications').insert({
+      user_id: authorId,
+      title: '⚠️ Trip Report Needs Revision',
+      message: `Your trip report "${tripTitle}" requires updates before publishing: ${reason}`,
+      type: 'trip_rejection',
+      link: `/my-trips`
+    });
+
+    // 3. Insert Audit Log
+    await supabase.from('audit_logs').insert({
+      actor_id: adminId,
+      action: 'REJECT_TRIP',
+      target_table: 'trips',
+      target_id: tripId,
+      details: { title: tripTitle, reason }
+    });
+
+    return true;
+  } catch (err) {
+    console.error('Error rejecting trip in Supabase:', err);
+    return false;
+  }
+}
+
+/**
+ * Super Admin Action: SOFT-DELETE TRIP
+ */
+export async function softDeleteTripInSupabase(tripId: string, adminId: string, tripTitle: string): Promise<boolean> {
+  if (!supabase) return false;
+
+  try {
+    const now = new Date().toISOString();
+    const { error: updateErr } = await supabase
+      .from('trips')
+      .update({
+        is_deleted: true,
+        deleted_by: adminId,
+        deleted_at: now
+      })
+      .eq('id', tripId);
+
+    if (updateErr) throw updateErr;
+
+    // Audit Log
+    await supabase.from('audit_logs').insert({
+      actor_id: adminId,
+      action: 'SOFT_DELETE_TRIP',
+      target_table: 'trips',
+      target_id: tripId,
+      details: { title: tripTitle }
+    });
+
+    return true;
+  } catch (err) {
+    console.error('Error soft-deleting trip in Supabase:', err);
+    return false;
+  }
+}
+
+/**
+ * Super Admin Action: RESTORE SOFT-DELETED TRIP
+ */
+export async function restoreTripInSupabase(tripId: string, adminId: string, tripTitle: string): Promise<boolean> {
+  if (!supabase) return false;
+
+  try {
+    const { error: updateErr } = await supabase
+      .from('trips')
+      .update({
+        is_deleted: false,
+        deleted_by: null,
+        deleted_at: null
+      })
+      .eq('id', tripId);
+
+    if (updateErr) throw updateErr;
+
+    // Audit Log
+    await supabase.from('audit_logs').insert({
+      actor_id: adminId,
+      action: 'RESTORE_TRIP',
+      target_table: 'trips',
+      target_id: tripId,
+      details: { title: tripTitle }
+    });
+
+    return true;
+  } catch (err) {
+    console.error('Error restoring trip in Supabase:', err);
+    return false;
+  }
+}
+
+/**
+ * Super Admin Action: PERMANENTLY DELETE TRIP (FROM TRASH)
+ */
+export async function permanentlyDeleteTripInSupabase(tripId: string, adminId: string): Promise<boolean> {
+  if (!supabase) return false;
+
+  try {
+    // 1. Audit Log
+    await supabase.from('audit_logs').insert({
+      actor_id: adminId,
+      action: 'PERMANENTLY_DELETE_TRIP',
+      target_table: 'trips',
+      target_id: tripId,
+      details: {}
+    });
+
+    // 2. Delete trip row
+    const { error: deleteErr } = await supabase.from('trips').delete().eq('id', tripId);
+    if (deleteErr) throw deleteErr;
+
+    return true;
+  } catch (err) {
+    console.error('Error permanently deleting trip:', err);
+    return false;
   }
 }
 

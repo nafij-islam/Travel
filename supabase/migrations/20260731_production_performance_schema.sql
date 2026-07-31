@@ -756,12 +756,62 @@ DROP POLICY IF EXISTS "User Insert Own Trip Images" ON public.trip_images;
 CREATE POLICY "User Insert Own Trip Images" ON public.trip_images
     FOR INSERT WITH CHECK (auth.uid() = uploaded_by);
 
-DROP POLICY IF EXISTS "Admin Update Trip Images" ON public.trip_images;
-CREATE POLICY "Admin Update Trip Images" ON public.trip_images
-    FOR UPDATE USING (
-        auth.uid() = uploaded_by 
-        OR public.is_admin_or_moderator(auth.uid())
-    );
+-- --------------------------------------------------------------------
+-- 9. MODERATION COLUMNS, AUDIT LOGS & USER NOTIFICATIONS TABLES
+-- --------------------------------------------------------------------
+
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS approved_by UUID REFERENCES public.profiles(id);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS approved_at TIMESTAMPTZ;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS rejected_by UUID REFERENCES public.profiles(id);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS rejected_at TIMESTAMPTZ;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS rejection_reason TEXT;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS deleted_by UUID REFERENCES public.profiles(id);
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE public.trips ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT FALSE;
+
+-- AUDIT LOGS TABLE
+CREATE TABLE IF NOT EXISTS public.audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    actor_id UUID REFERENCES public.profiles(id),
+    action TEXT NOT NULL,
+    target_table TEXT NOT NULL,
+    target_id UUID NOT NULL,
+    details JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.audit_logs ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admins Read Audit Logs" ON public.audit_logs;
+CREATE POLICY "Admins Read Audit Logs" ON public.audit_logs
+    FOR SELECT USING (public.is_admin_or_moderator(auth.uid()));
+
+DROP POLICY IF EXISTS "Admins Insert Audit Logs" ON public.audit_logs;
+CREATE POLICY "Admins Insert Audit Logs" ON public.audit_logs
+    FOR INSERT WITH CHECK (public.is_admin_or_moderator(auth.uid()));
+
+-- USER NOTIFICATIONS TABLE
+CREATE TABLE IF NOT EXISTS public.user_notifications (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(50) DEFAULT 'system',
+    link TEXT DEFAULT '',
+    is_read BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.user_notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users Read Own Notifications" ON public.user_notifications;
+CREATE POLICY "Users Read Own Notifications" ON public.user_notifications
+    FOR SELECT USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "Admins Insert User Notifications" ON public.user_notifications;
+CREATE POLICY "Admins Insert User Notifications" ON public.user_notifications
+    FOR INSERT WITH CHECK (public.is_admin_or_moderator(auth.uid()));
+
 
 
 
