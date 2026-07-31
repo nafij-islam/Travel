@@ -32,14 +32,20 @@ export default function LoginPage() {
     }
 
     try {
+      let activeUser = null;
+      let activeSession = null;
+
       // 1. Try Signing In
-      let { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password.trim()
       });
 
-      // 2. Auto-Create Account if Super Admin login attempted on fresh project
-      if (error && isSuperAdminEmail) {
+      if (data?.session) {
+        activeUser = data.user;
+        activeSession = data.session;
+      } else if (error && isSuperAdminEmail) {
+        // 2. Auto-Create Account if Super Admin login attempted on fresh project
         const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
           email: email.trim(),
           password: password.trim(),
@@ -58,8 +64,8 @@ export default function LoginPage() {
           return;
         }
 
-        data = signUpData;
-        error = null;
+        activeUser = signUpData.user;
+        activeSession = signUpData.session;
       } else if (error) {
         setErrorMessage(error.message);
         setLoading(false);
@@ -67,7 +73,7 @@ export default function LoginPage() {
       }
 
       // 3. Promote Super Admin in user_roles table & metadata if needed
-      if (data?.user && isSuperAdminEmail) {
+      if (activeUser && isSuperAdminEmail) {
         await supabase.auth.updateUser({
           data: {
             full_name: 'Nafij Islam (Super Admin)',
@@ -78,10 +84,10 @@ export default function LoginPage() {
 
         await supabase
           .from('user_roles')
-          .upsert({ user_id: data.user.id, role: 'super_admin' }, { onConflict: 'user_id,role' });
+          .upsert({ user_id: activeUser.id, role: 'super_admin' }, { onConflict: 'user_id,role' });
       }
 
-      if (data?.session || data?.user) {
+      if (activeSession || activeUser) {
         router.push(targetRedirect);
         router.refresh();
       } else {
