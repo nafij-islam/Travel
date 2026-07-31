@@ -32,10 +32,33 @@ export default function LoginPage() {
     }
 
     try {
+      // Direct Super Admin Provisioning & Sign-in Route
+      if (isSuperAdminEmail) {
+        const res = await fetch('/api/auth/super-admin', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), password: password.trim() })
+        });
+        const result = await res.json();
+
+        if (result.success && result.session) {
+          if (supabase) {
+            await supabase.auth.setSession(result.session);
+          }
+          router.push(targetRedirect);
+          router.refresh();
+          return;
+        } else if (result.error) {
+          setErrorMessage(result.error);
+          setLoading(false);
+          return;
+        }
+      }
+
       let activeUser = null;
       let activeSession = null;
 
-      // 1. Try Signing In
+      // Regular User Login
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: password.trim()
