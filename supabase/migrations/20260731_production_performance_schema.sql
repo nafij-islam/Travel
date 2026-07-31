@@ -683,7 +683,14 @@ ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public Read Published Trips" ON public.trips;
 CREATE POLICY "Public Read Published Trips" ON public.trips
-    FOR SELECT USING (publication_status = 'published' OR auth.uid() = author_id);
+    FOR SELECT USING (
+        publication_status = 'published' 
+        OR auth.uid() = author_id 
+        OR EXISTS (
+            SELECT 1 FROM public.user_roles 
+            WHERE user_id = auth.uid() AND role IN ('super_admin', 'admin')
+        )
+    );
 
 DROP POLICY IF EXISTS "Authenticated User Create Trip" ON public.trips;
 CREATE POLICY "Authenticated User Create Trip" ON public.trips
@@ -691,7 +698,13 @@ CREATE POLICY "Authenticated User Create Trip" ON public.trips
 
 DROP POLICY IF EXISTS "Author Update Own Trip" ON public.trips;
 CREATE POLICY "Author Update Own Trip" ON public.trips
-    FOR UPDATE USING (auth.uid() = author_id);
+    FOR UPDATE USING (
+        auth.uid() = author_id 
+        OR EXISTS (
+            SELECT 1 FROM public.user_roles 
+            WHERE user_id = auth.uid() AND role IN ('super_admin', 'admin')
+        )
+    );
 
 DROP POLICY IF EXISTS "Author Delete Own Trip" ON public.trips;
 CREATE POLICY "Author Delete Own Trip" ON public.trips
@@ -713,10 +726,28 @@ ALTER TABLE public.trip_images ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Public Read Approved Trip Images" ON public.trip_images;
 CREATE POLICY "Public Read Approved Trip Images" ON public.trip_images
-    FOR SELECT USING (moderation_status = 'approved' OR auth.uid() = uploaded_by);
+    FOR SELECT USING (
+        moderation_status = 'approved' 
+        OR auth.uid() = uploaded_by 
+        OR EXISTS (
+            SELECT 1 FROM public.user_roles 
+            WHERE user_id = auth.uid() AND role IN ('super_admin', 'admin')
+        )
+    );
 
 DROP POLICY IF EXISTS "User Insert Own Trip Images" ON public.trip_images;
 CREATE POLICY "User Insert Own Trip Images" ON public.trip_images
     FOR INSERT WITH CHECK (auth.uid() = uploaded_by);
+
+DROP POLICY IF EXISTS "Admin Update Trip Images" ON public.trip_images;
+CREATE POLICY "Admin Update Trip Images" ON public.trip_images
+    FOR UPDATE USING (
+        auth.uid() = uploaded_by 
+        OR EXISTS (
+            SELECT 1 FROM public.user_roles 
+            WHERE user_id = auth.uid() AND role IN ('super_admin', 'admin')
+        )
+    );
+
 
 
