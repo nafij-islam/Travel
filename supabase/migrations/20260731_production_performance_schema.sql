@@ -654,10 +654,12 @@ VALUES ('trip-images', 'trip-images', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- Avatars Storage Policy: Public Read Access
+DROP POLICY IF EXISTS "Public Read Avatars" ON storage.objects;
 CREATE POLICY "Public Read Avatars" ON storage.objects
     FOR SELECT USING (bucket_id = 'avatars');
 
 -- Avatars Storage Policy: Authenticated User Upload to own folder
+DROP POLICY IF EXISTS "User Avatar Upload" ON storage.objects;
 CREATE POLICY "User Avatar Upload" ON storage.objects
     FOR INSERT WITH CHECK (
         bucket_id = 'avatars' AND 
@@ -665,6 +667,7 @@ CREATE POLICY "User Avatar Upload" ON storage.objects
     );
 
 -- Avatars Storage Policy: Authenticated User Update/Delete own folder
+DROP POLICY IF EXISTS "User Avatar Modify" ON storage.objects;
 CREATE POLICY "User Avatar Modify" ON storage.objects
     FOR UPDATE USING (
         bucket_id = 'avatars' AND 
