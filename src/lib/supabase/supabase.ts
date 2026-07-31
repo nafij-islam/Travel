@@ -208,11 +208,19 @@ export async function createTripInSupabase(
       if (newDest) destId = newDest.id;
     }
 
+    // Get authenticated user ID for RLS compliance
+    const { data: { user } } = await supabase.auth.getUser();
+    const validAuthorId = user?.id || authorId;
+
+    if (!validAuthorId || validAuthorId === 'anon_user') {
+      throw new Error('Please sign in or complete your registration before submitting a trip report.');
+    }
+
     // 1. Insert main trip
     const { data: trip, error: tripError } = await supabase
       .from('trips')
       .insert({
-        author_id: authorId,
+        author_id: validAuthorId,
         title: tripData.title,
         slug,
         summary: tripData.title,

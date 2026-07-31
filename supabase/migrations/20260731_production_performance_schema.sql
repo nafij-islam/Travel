@@ -671,3 +671,49 @@ CREATE POLICY "User Avatar Modify" ON storage.objects
         auth.uid()::text = (storage.foldername(name))[2]
     );
 
+-- --------------------------------------------------------------------
+-- 8. TABLE ROW LEVEL SECURITY (RLS) POLICIES
+-- --------------------------------------------------------------------
+
+-- TRIPS TABLE RLS
+ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public Read Published Trips" ON public.trips;
+CREATE POLICY "Public Read Published Trips" ON public.trips
+    FOR SELECT USING (publication_status = 'published' OR auth.uid() = author_id);
+
+DROP POLICY IF EXISTS "Authenticated User Create Trip" ON public.trips;
+CREATE POLICY "Authenticated User Create Trip" ON public.trips
+    FOR INSERT WITH CHECK (auth.uid() = author_id);
+
+DROP POLICY IF EXISTS "Author Update Own Trip" ON public.trips;
+CREATE POLICY "Author Update Own Trip" ON public.trips
+    FOR UPDATE USING (auth.uid() = author_id);
+
+DROP POLICY IF EXISTS "Author Delete Own Trip" ON public.trips;
+CREATE POLICY "Author Delete Own Trip" ON public.trips
+    FOR DELETE USING (auth.uid() = author_id);
+
+-- PROFILES TABLE RLS
+ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public Read Profiles" ON public.profiles;
+CREATE POLICY "Public Read Profiles" ON public.profiles
+    FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "User Update Own Profile" ON public.profiles;
+CREATE POLICY "User Update Own Profile" ON public.profiles
+    FOR UPDATE USING (auth.uid() = id);
+
+-- TRIP IMAGES TABLE RLS
+ALTER TABLE public.trip_images ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public Read Approved Trip Images" ON public.trip_images;
+CREATE POLICY "Public Read Approved Trip Images" ON public.trip_images
+    FOR SELECT USING (moderation_status = 'approved' OR auth.uid() = uploaded_by);
+
+DROP POLICY IF EXISTS "User Insert Own Trip Images" ON public.trip_images;
+CREATE POLICY "User Insert Own Trip Images" ON public.trip_images
+    FOR INSERT WITH CHECK (auth.uid() = uploaded_by);
+
+

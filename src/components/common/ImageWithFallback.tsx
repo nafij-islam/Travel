@@ -16,6 +16,7 @@ interface ImageWithFallbackProps {
   priority?: boolean;
   quality?: number;
   preset?: 'galleryThumbnail' | 'destinationCard' | 'tripCoverCard' | 'lightboxPreview';
+  transparentBg?: boolean;
 }
 
 export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
@@ -29,7 +30,8 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
   sizes = '(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw',
   priority = false,
   quality = 75,
-  preset
+  preset,
+  transparentBg = false
 }) => {
   const [imgSrc, setImgSrc] = useState<string>(() => {
     if (!src) return fallbackSrc;
@@ -67,8 +69,8 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
     imgSrc.startsWith('/') ||
     imgSrc.startsWith('data:');
 
-  if (!isUnsplashOrSupabase) {
-    // Fallback standard img for unconfigured domains
+  if (!isUnsplashOrSupabase || transparentBg) {
+    // Fallback standard img for unconfigured domains or transparent logos
     return (
       <img
         src={imgSrc}
@@ -76,7 +78,7 @@ export const ImageWithFallback: React.FC<ImageWithFallbackProps> = ({
         loading={priority ? 'eager' : 'lazy'}
         decoding="async"
         onError={handleError}
-        className={`object-cover transform-gpu ${className}`}
+        className={`object-contain transform-gpu ${className}`}
       />
     );
   }

@@ -150,6 +150,7 @@ export const Header: React.FC = () => {
                 src="/images/logo.png"
                 fallbackSrc="/logo.png"
                 alt="Jatrio"
+                transparentBg
                 className="h-16 w-auto object-contain hover:scale-105 transition-transform duration-200"
               />
             </div>
