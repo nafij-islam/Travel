@@ -35,13 +35,15 @@ export default function AdminDashboardPage() {
       }
       try {
         // Fetch Pending Trips awaiting moderation
-        const { data: tripsData } = await supabase
+        const { data: tripsData, error: tripsError } = await supabase
           .from('trips')
           .select(`*, author:profiles(*)`)
           .eq('publication_status', 'pending_review')
           .order('created_at', { ascending: false });
 
-        if (tripsData) {
+        if (tripsError) {
+          console.error('Error querying pending trips from Supabase:', tripsError);
+        } else if (tripsData) {
           setPendingTrips(
             tripsData.map((t: any) => ({
               id: t.id,

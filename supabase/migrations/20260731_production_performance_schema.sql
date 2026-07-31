@@ -675,8 +675,34 @@ CREATE POLICY "User Avatar Modify" ON storage.objects
     );
 
 -- --------------------------------------------------------------------
--- 8. TABLE ROW LEVEL SECURITY (RLS) POLICIES
+-- 8. HELPER SECURITY DEFINER FUNCTION & TABLE RLS POLICIES
 -- --------------------------------------------------------------------
+
+-- SECURITY DEFINER Helper Function: Check Admin or Moderator role
+CREATE OR REPLACE FUNCTION public.is_admin_or_moderator(user_uuid UUID)
+RETURNS BOOLEAN AS $$
+BEGIN
+    IF user_uuid IS NULL THEN
+        RETURN FALSE;
+    END IF;
+
+    RETURN EXISTS (
+        SELECT 1 FROM public.user_roles 
+        WHERE user_id = user_uuid 
+        AND role::text IN ('super_admin', 'admin', 'moderator')
+    );
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
+
+-- USER ROLES TABLE RLS
+ALTER TABLE public.user_roles ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Public Read Own User Roles" ON public.user_roles;
+CREATE POLICY "Public Read Own User Roles" ON public.user_roles
+    FOR SELECT USING (
+        user_id = auth.uid() 
+        OR public.is_admin_or_moderator(auth.uid())
+    );
 
 -- TRIPS TABLE RLS
 ALTER TABLE public.trips ENABLE ROW LEVEL SECURITY;
@@ -686,10 +712,7 @@ CREATE POLICY "Public Read Published Trips" ON public.trips
     FOR SELECT USING (
         publication_status = 'published' 
         OR auth.uid() = author_id 
-        OR EXISTS (
-            SELECT 1 FROM public.user_roles 
-            WHERE user_id = auth.uid() AND role::text IN ('super_admin', 'admin', 'moderator')
-        )
+        OR public.is_admin_or_moderator(auth.uid())
     );
 
 DROP POLICY IF EXISTS "Authenticated User Create Trip" ON public.trips;
@@ -700,10 +723,7 @@ DROP POLICY IF EXISTS "Author Update Own Trip" ON public.trips;
 CREATE POLICY "Author Update Own Trip" ON public.trips
     FOR UPDATE USING (
         auth.uid() = author_id 
-        OR EXISTS (
-            SELECT 1 FROM public.user_roles 
-            WHERE user_id = auth.uid() AND role::text IN ('super_admin', 'admin', 'moderator')
-        )
+        OR public.is_admin_or_moderator(auth.uid())
     );
 
 DROP POLICY IF EXISTS "Author Delete Own Trip" ON public.trips;
@@ -729,10 +749,7 @@ CREATE POLICY "Public Read Approved Trip Images" ON public.trip_images
     FOR SELECT USING (
         moderation_status = 'approved' 
         OR auth.uid() = uploaded_by 
-        OR EXISTS (
-            SELECT 1 FROM public.user_roles 
-            WHERE user_id = auth.uid() AND role::text IN ('super_admin', 'admin', 'moderator')
-        )
+        OR public.is_admin_or_moderator(auth.uid())
     );
 
 DROP POLICY IF EXISTS "User Insert Own Trip Images" ON public.trip_images;
@@ -743,11 +760,9 @@ DROP POLICY IF EXISTS "Admin Update Trip Images" ON public.trip_images;
 CREATE POLICY "Admin Update Trip Images" ON public.trip_images
     FOR UPDATE USING (
         auth.uid() = uploaded_by 
-        OR EXISTS (
-            SELECT 1 FROM public.user_roles 
-            WHERE user_id = auth.uid() AND role::text IN ('super_admin', 'admin', 'moderator')
-        )
+        OR public.is_admin_or_moderator(auth.uid())
     );
+
 
 
 
