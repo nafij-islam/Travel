@@ -34,7 +34,6 @@ export default function QuestionsPage() {
         if (!error && data) {
           setQuestions(data.map((q: any): Question => ({
             id: q.id,
-            authorId: q.author_id,
             author: {
               id: q.author?.id || 'anon',
               fullName: q.author?.full_name || 'Traveler',
@@ -102,7 +101,6 @@ export default function QuestionsPage() {
       } else if (newQ) {
         const formattedQ: Question = {
           id: newQ.id,
-          authorId: newQ.author_id,
           author: {
             id: newQ.author?.id || user.id,
             fullName: newQ.author?.full_name || 'You',

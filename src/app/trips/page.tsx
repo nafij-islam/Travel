@@ -84,7 +84,7 @@ function ExploreTripsContent() {
       if (sortBy === 'cost_asc') return a.costPerPerson - b.costPerPerson;
       if (sortBy === 'cost_desc') return b.costPerPerson - a.costPerPerson;
       if (sortBy === 'duration') return b.durationDays - a.durationDays;
-      if (sortBy === 'recent') return new Date(b.publishedAt || b.createdAt).getTime() - new Date(a.publishedAt || a.createdAt).getTime();
+      if (sortBy === 'recent') return new Date(b.publishedAt || '2026-01-01').getTime() - new Date(a.publishedAt || '2026-01-01').getTime();
       return (b.saveCount || 0) - (a.saveCount || 0); // 'popular'
     });
   }, [trips, searchTerm, selectedDestination, selectedStartCity, selectedStyle, maxCostFilter, contentLangFilter, sortBy]);
