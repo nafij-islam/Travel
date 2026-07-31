@@ -36,7 +36,9 @@ import {
   LogOut,
   Bookmark,
   Settings,
-  Briefcase
+  Briefcase,
+  ShieldCheck,
+  Globe
 } from 'lucide-react';
 import { MOCK_TRAVEL_STYLES } from '@/lib/data/mockData';
 
@@ -416,6 +418,47 @@ export const Header: React.FC = () => {
                         <Settings className="w-4 h-4 text-slate-400" />
                         <span>Account Settings</span>
                       </Link>
+
+                      {/* Super Admin & Admin Consoles Section */}
+                      {(currentUser?.email === 'sahariannafis70@gmail.com' ||
+                        currentUser?.username === 'sahariannafis70' ||
+                        currentUser?.role === 'super_admin' ||
+                        currentUser?.role === 'admin') && (
+                        <>
+                          <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
+                          <div className="px-2 py-1 text-[10px] font-bold uppercase text-brand-purple dark:text-brand-cyan tracking-wider flex items-center gap-1">
+                            <ShieldCheck className="w-3.5 h-3.5 text-brand-purple dark:text-brand-cyan" />
+                            <span>Admin Consoles</span>
+                          </div>
+
+                          <Link
+                            href="/admin"
+                            onClick={() => setIsProfileDropdownOpen(false)}
+                            className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-brand-purple/10 text-brand-purple dark:text-brand-cyan font-bold"
+                          >
+                            <ShieldCheck className="w-4 h-4 text-brand-purple dark:text-brand-cyan" />
+                            <span>Control Center (/admin)</span>
+                          </Link>
+
+                          <Link
+                            href="/super-admin"
+                            onClick={() => setIsProfileDropdownOpen(false)}
+                            className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold"
+                          >
+                            <Award className="w-4 h-4 text-amber-500" />
+                            <span>Super Admin (/super-admin)</span>
+                          </Link>
+
+                          <Link
+                            href="/admin/seo"
+                            onClick={() => setIsProfileDropdownOpen(false)}
+                            className="flex items-center gap-2.5 p-2 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 font-semibold"
+                          >
+                            <Globe className="w-4 h-4 text-emerald-500" />
+                            <span>SEO Governance (/admin/seo)</span>
+                          </Link>
+                        </>
+                      )}
 
                       <div className="my-1 border-t border-slate-100 dark:border-slate-800" />
 
