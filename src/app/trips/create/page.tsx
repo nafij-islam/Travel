@@ -15,17 +15,23 @@ import {
   Calendar,
   Image as ImageIcon
 } from 'lucide-react';
+import { createTripInSupabase } from '@/lib/supabase/supabase';
+import { createClient } from '@/lib/supabase/client';
+import { ImageUploader, UploadItem } from '@/components/trips/ImageUploader';
+import { DestinationSearchInput } from '@/components/trips/DestinationSearchInput';
 
 export default function ShareTripPage() {
   const { t, locale } = useTranslation();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
     title: '',
     startLocationText: 'Dhaka',
     destinationSlug: 'sajek-valley',
+    destinationInputText: 'Sajek Valley',
     durationDays: 3,
     travelerCount: 4,
     travelStyleSlug: 'student-budget',
@@ -61,8 +67,8 @@ export default function ShareTripPage() {
     costSavingTips: 'Share Chander Gari at Khagrachari bus stand to split ৳4,500 cost.',
     whatToCarry: 'Power bank, Cash, Odomos insect repellent',
 
-    // Photos
-    coverImagePath: '/images/sajek_cloud_valley.png'
+    // Photos state (Drag & Drop Uploader)
+    uploadedImages: [] as UploadItem[]
   });
 
   // Calculate totals
@@ -77,9 +83,27 @@ export default function ShareTripPage() {
     if (currentStep > 1) setCurrentStep(currentStep - 1);
   };
 
-  const handlePublish = () => {
-    alert('Congratulations! Your trip has been published live on Ghurabo.');
-    router.push('/trips');
+  const handlePublish = async () => {
+    setIsSubmitting(true);
+    const supabase = createClient();
+    const { data: sessionData } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+    const authorId = sessionData?.session?.user?.id || 'anon_user';
+
+    const payload = {
+      ...formData,
+      totalCost,
+      costPerPerson
+    };
+
+    const res = await createTripInSupabase(payload, authorId, formData.uploadedImages);
+
+    setIsSubmitting(false);
+    if (res.success) {
+      alert('Congratulations! Your trip report & photos have been submitted for moderation on Ghurabo.');
+      router.push('/trips');
+    } else {
+      alert(`Error submitting trip: ${res.error}`);
+    }
   };
 
   return (
@@ -147,16 +171,16 @@ export default function ShareTripPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs font-bold text-slate-700 block mb-1">Destination</label>
-                  <select
-                    value={formData.destinationSlug}
-                    onChange={(e) => setFormData({ ...formData, destinationSlug: e.target.value })}
-                    className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium focus:outline-none focus:border-brand-purple"
-                  >
-                    {MOCK_DESTINATIONS.map((d) => (
-                      <option key={d.id} value={d.slug}>{d.nameEn} ({d.district})</option>
-                    ))}
-                  </select>
+                  <DestinationSearchInput
+                    value={formData.destinationSlug || formData.destinationInputText}
+                    onChange={(selected) => {
+                      setFormData({
+                        ...formData,
+                        destinationSlug: selected.slug,
+                        destinationInputText: selected.nameEn
+                      });
+                    }}
+                  />
                 </div>
               </div>
 
@@ -420,27 +444,22 @@ export default function ShareTripPage() {
           </div>
         )}
 
-        {/* STEP 7: PHOTOS */}
+        {/* STEP 7: PHOTOS & MULTI-IMAGE UPLOADER */}
         {currentStep === 7 && (
           <div className="space-y-4">
-            <h3 className="text-base font-bold text-slate-900 font-heading flex items-center gap-2">
-              <ImageIcon className="w-5 h-5 text-brand-purple" />
-              <span>Step 7: Cover & Photos</span>
-            </h3>
-            <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">Cover Image URL</label>
-              <input
-                type="text"
-                value={formData.coverImagePath}
-                onChange={(e) => setFormData({ ...formData, coverImagePath: e.target.value })}
-                className="w-full p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs font-medium"
-              />
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-slate-900 font-heading flex items-center gap-2">
+                <ImageIcon className="w-5 h-5 text-brand-purple" />
+                <span>Step 7: Upload Trip Photos</span>
+              </h3>
             </div>
-            <div className="p-6 border-2 border-dashed border-slate-300 bg-slate-50 rounded-xl text-center space-y-2">
-              <Upload className="w-8 h-8 text-brand-purple mx-auto" />
-              <div className="text-xs font-bold text-slate-700">Drag & drop gallery images or click to upload</div>
-              <div className="text-[10px] text-slate-400">JPG, PNG, WebP up to 5MB</div>
-            </div>
+            <p className="text-xs text-slate-500">
+              Drag and drop high-quality trip photos. Selected cover photo will be displayed as the main card thumbnail in public galleries.
+            </p>
+            <ImageUploader
+              images={formData.uploadedImages}
+              onChange={(updatedImages) => setFormData({ ...formData, uploadedImages: updatedImages })}
+            />
           </div>
         )}
 

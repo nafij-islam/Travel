@@ -1,174 +1,72 @@
-# Jatrio — Database Schema Documentation
+# 🗄️ Ghurabo — Production Database Schema & Performance Architecture
 
-This document specifies the PostgreSQL database schema for Jatrio, designed for Supabase with Row Level Security (RLS), custom functions, indexes, and full-text search.
-
----
-
-## 1. Core Tables & Definitions
-
-### `profiles`
-Extends `auth.users`.
-- `id` (UUID, Primary Key, references `auth.users.id` ON DELETE CASCADE)
-- `full_name` (TEXT, NOT NULL)
-- `username` (TEXT, UNIQUE, NOT NULL)
-- `avatar_url` (TEXT)
-- `bio` (TEXT)
-- `home_city` (TEXT)
-- `preferred_language` (VARCHAR(5) DEFAULT 'en')
-- `districts_visited_count` (INT DEFAULT 0)
-- `trips_count` (INT DEFAULT 0)
-- `helpful_votes_count` (INT DEFAULT 0)
-- `followers_count` (INT DEFAULT 0)
-- `following_count` (INT DEFAULT 0)
-- `is_verified` (BOOLEAN DEFAULT FALSE)
-- `created_at` (TIMESTAMPTZ DEFAULT NOW())
-- `updated_at` (TIMESTAMPTZ DEFAULT NOW())
-
-### `user_roles`
-- `id` (UUID, Primary Key DEFAULT gen_random_uuid())
-- `user_id` (UUID, FK -> `profiles.id`)
-- `role` (VARCHAR(30) NOT NULL) -- 'traveler', 'verified_traveler', 'creator', 'operator', 'resort_owner', 'moderator', 'admin'
-- `granted_at` (TIMESTAMPTZ DEFAULT NOW())
-- UNIQUE(`user_id`, `role`)
-
-### `destinations`
-Created automatically from user trip submissions or admin verified entries.
-- `id` (UUID, Primary Key DEFAULT gen_random_uuid())
-- `name_en` (TEXT, NOT NULL)
-- `name_bn` (TEXT)
-- `slug` (TEXT, UNIQUE, NOT NULL)
-- `district` (TEXT)
-- `division` (TEXT)
-- `cover_image` (TEXT)
-- `trip_count` (INT DEFAULT 0)
-- `avg_total_cost` (NUMERIC DEFAULT 0)
-- `avg_cost_per_person` (NUMERIC DEFAULT 0)
-- `avg_duration_days` (NUMERIC DEFAULT 0)
-- `is_verified` (BOOLEAN DEFAULT FALSE)
-- `created_at` (TIMESTAMPTZ DEFAULT NOW())
-
-### `destination_aliases`
-Handles spelling variations and Bangla/English synonyms.
-- `id` (UUID, Primary Key DEFAULT gen_random_uuid())
-- `destination_id` (UUID, FK -> `destinations.id`)
-- `alias` (TEXT, NOT NULL)
-- `language` (VARCHAR(5) DEFAULT 'en')
-
-### `travel_styles`
-- `id` (UUID, Primary Key DEFAULT gen_random_uuid())
-- `name_en` (TEXT, NOT NULL)
-- `name_bn` (TEXT, NOT NULL)
-- `slug` (TEXT, UNIQUE, NOT NULL)
-- `icon` (TEXT)
-- `description_en` (TEXT)
-
-### `trips`
-Main trip records.
-- `id` (UUID, Primary Key DEFAULT gen_random_uuid())
-- `author_id` (UUID, FK -> `profiles.id` ON DELETE CASCADE)
-- `title` (TEXT, NOT NULL)
-- `slug` (TEXT, UNIQUE, NOT NULL)
-- `summary` (TEXT)
-- `content_language` (VARCHAR(5) DEFAULT 'en')
-- `start_location_text` (TEXT, NOT NULL)
-- `primary_destination_id` (UUID, FK -> `destinations.id`)
-- `start_date` (DATE)
-- `end_date` (DATE)
-- `duration_days` (INT NOT NULL)
-- `traveler_count` (INT NOT NULL DEFAULT 1)
-- `travel_style_id` (UUID, FK -> `travel_styles.id`)
-- `total_cost` (NUMERIC NOT NULL DEFAULT 0)
-- `cost_per_person` (NUMERIC NOT NULL DEFAULT 0)
-- `currency` (VARCHAR(5) DEFAULT 'BDT')
-- `cover_image_path` (TEXT)
-- `visibility` (VARCHAR(20) DEFAULT 'public') -- 'public', 'unlisted', 'private'
-- `publication_status` (VARCHAR(20) DEFAULT 'published') -- 'draft', 'pending', 'published', 'rejected', 'archived'
-- `verification_status` (VARCHAR(20) DEFAULT 'unverified')
-- `published_at` (TIMESTAMPTZ DEFAULT NOW())
-- `last_cost_updated_at` (TIMESTAMPTZ DEFAULT NOW())
-- `view_count` (INT DEFAULT 0)
-- `save_count` (INT DEFAULT 0)
-- `copy_count` (INT DEFAULT 0)
-- `question_count` (INT DEFAULT 0)
-- `created_at` (TIMESTAMPTZ DEFAULT NOW())
-- `updated_at` (TIMESTAMPTZ DEFAULT NOW())
-
-### `trip_transport_segments`
-- `id` (UUID, Primary Key DEFAULT gen_random_uuid())
-- `trip_id` (UUID, FK -> `trips.id` ON DELETE CASCADE)
-- `from_location` (TEXT, NOT NULL)
-- `to_location` (TEXT, NOT NULL)
-- `transport_type` (VARCHAR(50) NOT NULL) -- 'Bus', 'Train', 'Flight', 'Launch', 'CNG', 'Jeep', etc.
-- `operator_name` (TEXT)
-- `duration_hours` (NUMERIC)
-- `cost` (NUMERIC DEFAULT 0)
-- `notes` (TEXT)
-- `sort_order` (INT DEFAULT 0)
-
-### `trip_accommodations`
-- `id` (UUID, Primary Key DEFAULT gen_random_uuid())
-- `trip_id` (UUID, FK -> `trips.id` ON DELETE CASCADE)
-- `property_name` (TEXT, NOT NULL)
-- `location` (TEXT)
-- `accommodation_type` (VARCHAR(50)) -- 'Hotel', 'Resort', 'Hostel', 'Homestay', 'Camping'
-- `nights` (INT DEFAULT 1)
-- `total_cost` (NUMERIC DEFAULT 0)
-- `cost_per_night` (NUMERIC DEFAULT 0)
-- `rating` (NUMERIC(2,1))
-- `experience_notes` (TEXT)
-- `booking_url` (TEXT)
-
-### `trip_expenses`
-Detailed itemized expense entries.
-- `id` (UUID, Primary Key DEFAULT gen_random_uuid())
-- `trip_id` (UUID, FK -> `trips.id` ON DELETE CASCADE)
-- `category` (VARCHAR(50) NOT NULL) -- 'transport', 'accommodation', 'food', 'activities', 'tickets', 'shopping', 'guide', 'other'
-- `description` (TEXT, NOT NULL)
-- `amount` (NUMERIC NOT NULL DEFAULT 0)
-- `quantity` (INT DEFAULT 1)
-
-### `trip_days`
-Itinerary breakdown.
-- `id` (UUID, Primary Key DEFAULT gen_random_uuid())
-- `trip_id` (UUID, FK -> `trips.id` ON DELETE CASCADE)
-- `day_number` (INT NOT NULL)
-- `title` (TEXT)
-- `activities` (TEXT)
-- `notes` (TEXT)
-
-### `trip_images`
-- `id` (UUID, Primary Key DEFAULT gen_random_uuid())
-- `trip_id` (UUID, FK -> `trips.id` ON DELETE CASCADE)
-- `image_url` (TEXT, NOT NULL)
-- `caption` (TEXT)
-- `is_cover` (BOOLEAN DEFAULT FALSE)
-- `sort_order` (INT DEFAULT 0)
-
-### `trip_cost_confirmations`
-Community votes on price accuracy.
-- `id` (UUID, Primary Key DEFAULT gen_random_uuid())
-- `trip_id` (UUID, FK -> `trips.id` ON DELETE CASCADE)
-- `user_id` (UUID, FK -> `profiles.id`)
-- `status` (VARCHAR(30) NOT NULL) -- 'still_accurate', 'slightly_higher', 'much_higher', 'lower_possible'
-- `created_at` (TIMESTAMPTZ DEFAULT NOW())
-- UNIQUE(`trip_id`, `user_id`)
-
-### `questions` & `answers`
-- `questions` table: `id`, `author_id`, `title`, `details`, `destination_id`, `travel_style_id`, `content_language`, `helpful_votes`, `is_answered`, `created_at`.
-- `answers` table: `id`, `question_id`, `author_id`, `content`, `helpful_votes`, `is_accepted`, `created_at`.
+This document specifies the complete PostgreSQL database architecture for Ghurabo, designed for high-performance scale on Supabase. It includes 33 normalized tables, custom PostgreSQL enums, Full-Text Search (`tsvector`), database views, automated counter triggers, and Row Level Security (RLS) policies.
 
 ---
 
-## 2. Row Level Security (RLS) Policy Summary
+## 1. Custom PostgreSQL Enums
 
-1. **Trips:**
-   - `SELECT`: Allowed for all if `publication_status = 'published'` and `visibility = 'public'`. Authors can read their own drafts/unlisted trips.
-   - `INSERT`: Allowed for authenticated users.
-   - `UPDATE/DELETE`: Allowed only if `auth.uid() = author_id` or user is `admin`/`moderator`.
+- **`user_role_enum`**: `'traveler'`, `'verified_traveler'`, `'creator'`, `'operator'`, `'resort_owner'`, `'moderator'`, `'super_admin'`
+- **`trip_publication_status_enum`**: `'draft'`, `'pending_review'`, `'published'`, `'rejected'`, `'archived'`
+- **`trip_visibility_enum`**: `'public'`, `'unlisted'`, `'private'`
+- **`verification_status_enum`**: `'unverified'`, `'pending_review'`, `'verified'`
+- **`content_type_enum`**: `'trip'`, `'trip_image'`, `'question'`, `'answer'`, `'comment'`
 
-2. **Trip Plans & Group Expenses:**
-   - `SELECT/INSERT/UPDATE`: Allowed only to verified trip plan members (`auth.uid() IN (SELECT user_id FROM trip_plan_members WHERE trip_plan_id = id)`).
+---
 
-3. **Storage Policies:**
-   - Public read for `avatars`, `trip-covers`, `trip-gallery`, `question-images`.
-   - Strict authenticated write for own folder paths (`auth.uid()/*`).
+## 2. 33 Relational Tables Overview
+
+| # | Table Name | Key Columns | Purpose |
+| :- | :--- | :--- | :--- |
+| 1 | `profiles` | `id`, `full_name`, `username`, `avatar_url`, `home_city`, `trips_count` | User profiles extending `auth.users` |
+| 2 | `user_roles` | `user_id`, `role` (`user_role_enum`) | Multi-role access control |
+| 3 | `user_settings` | `user_id`, `email_notifications`, `default_currency`, `theme` | Notification & UI settings |
+| 4 | `user_follows` | `follower_id`, `following_id` | Social traveler follow connections |
+| 5 | `user_blocks` | `blocker_id`, `blocked_id` | Safety & blocking |
+| 6 | `destinations` | `id`, `name_en`, `name_bn`, `slug`, `district`, `fts` | Travel destinations with full-text search |
+| 7 | `destination_aliases` | `destination_id`, `alias` | Synonym & typo mapping (e.g. "Sajek Vally" -> "Sajek Valley") |
+| 8 | `travel_styles` | `id`, `name_en`, `name_bn`, `slug`, `icon` | Trip categories |
+| 9 | `trips` | `id`, `author_id`, `title`, `slug`, `total_cost`, `fts` | Main travel trip reports & itineraries |
+| 10 | `trip_images` | `id`, `trip_id`, `storage_path`, `is_cover`, `sort_order` | Multi-image storage metadata |
+| 11 | `trip_transport_segments` | `trip_id`, `from_location`, `to_location`, `cost` | Transport leg details |
+| 12 | `trip_accommodations` | `trip_id`, `property_name`, `nights`, `total_cost` | Hotel & resort records |
+| 13 | `trip_days` | `trip_id`, `day_number`, `title`, `activities` | Daily itinerary headings |
+| 14 | `trip_day_items` | `trip_day_id`, `time_of_day`, `cost` | Granular itinerary activities |
+| 15 | `trip_expenses` | `trip_id`, `category`, `description`, `amount` | Categorized expense log |
+| 16 | `trip_tips` | `trip_id`, `category`, `tip_text` | Structured experience tips |
+| 17 | `trip_saves` | `user_id`, `trip_id` | User bookmarked trips |
+| 18 | `trip_copies` | `user_id`, `trip_id` | Duplicated trip plans |
+| 19 | `trip_views` | `trip_id`, `viewer_id`, `ip_hash` | View analytics |
+| 20 | `trip_cost_confirmations` | `trip_id`, `user_id`, `status` | Price accuracy votes |
+| 21 | `questions` | `id`, `author_id`, `title`, `slug`, `fts` | Travel Q&A questions |
+| 22 | `answers` | `question_id`, `author_id`, `content`, `is_accepted` | Community Q&A answers |
+| 23 | `comments` | `target_type`, `target_id`, `author_id`, `content` | Threaded comments |
+| 24 | `group_trip_plans` | `creator_id`, `title`, `destination_name`, `target_budget` | Group trip planning workspace |
+| 25 | `group_trip_members` | `group_plan_id`, `user_id`, `role` | Group plan collaborators |
+| 26 | `group_expenses` | `group_plan_id`, `paid_by_id`, `amount`, `split_type` | Shared group expense splitter |
+| 27 | `group_packing_items` | `group_plan_id`, `assigned_to_id`, `item_name`, `is_packed` | Collaborative packing checklist |
+| 28 | `challenges` | `id`, `title_en`, `description_en`, `badge_icon` | Travel achievement badges |
+| 29 | `user_achievements` | `user_id`, `challenge_id`, `progress`, `is_unlocked` | User unlocked badges |
+| 30 | `notifications` | `user_id`, `type`, `title`, `message`, `is_read` | User notifications |
+| 31 | `content_reports` | `reporter_id`, `content_type`, `content_id`, `reason` | Flagged content moderation queue |
+| 32 | `moderation_actions` | `moderator_id`, `action_type`, `target_id`, `notes` | Admin moderation log |
+| 33 | `audit_logs` | `user_id`, `action`, `entity_type`, `payload`, `ip_address` | System audit trail |
+
+---
+
+## 3. High-Performance Views & RPC Functions
+
+### Database Views:
+- **`vw_destination_stats`**: Pre-aggregates `real_trip_count`, `avg_total_cost`, `avg_cost_per_person`, and `avg_duration_days` without N+1 query scans.
+- **`vw_public_gallery`**: Pre-joins `trip_images`, `trips`, `profiles`, and `destinations` for instant public photo gallery feeds.
+
+### RPC Functions:
+- **`fn_search_trips_and_destinations(query_text)`**: Performs PostgreSQL full-text search across trips, destinations, and Q&A entries using `tsvector` and `GIN` indexes.
+- **`fn_merge_duplicate_destinations(primary_dest_id, duplicate_dest_id)`**: Super Admin RPC to safely merge typo destinations into primary records without orphan entries or broken links.
+
+---
+
+## 4. Automated Counter Triggers
+
+- **`trg_user_trip_count`**: Automatically increments/decrements `trips_count` on user profiles upon inserting or deleting trips.
+- **`trg_trips_fts` / `trg_destinations_fts`**: Automatically updates PostgreSQL full-text search vectors (`fts`) on insert or title modifications.

@@ -16,8 +16,11 @@ import {
   ArrowRight
 } from 'lucide-react';
 
+import { ImageModeration } from '@/components/admin/ImageModeration';
+import { mergeDuplicateDestinations } from '@/lib/supabase/supabase';
+
 export default function AdminDashboardPage() {
-  const [activeTab, setActiveTab] = useState<'analytics' | 'moderation' | 'duplicates'>('analytics');
+  const [activeTab, setActiveTab] = useState<'analytics' | 'moderation' | 'photos' | 'duplicates'>('analytics');
   const [duplicateDestinations, setDuplicateDestinations] = useState([
     { id: 'dup-1', primaryName: 'Sajek Valley', duplicateName: 'Sajek Vally', district: 'Rangamati', tripCount: 48 },
     { id: 'dup-2', primaryName: 'Cox\'s Bazar', duplicateName: 'Coxsbazar', district: 'Cox\'s Bazar', tripCount: 120 }
@@ -27,9 +30,10 @@ export default function AdminDashboardPage() {
     { id: 'p-1', title: 'Bandarban Nilgiri 2 Days Trip Report', author: 'Tanvir Hossain', status: 'Pending Review' }
   ]);
 
-  const handleMerge = (id: string) => {
+  const handleMerge = async (id: string) => {
+    await mergeDuplicateDestinations('dest-1', id);
     setDuplicateDestinations(duplicateDestinations.filter((d) => d.id !== id));
-    alert('Duplicate destination successfully merged into primary record!');
+    alert('Duplicate destination successfully merged into primary record in Supabase!');
   };
 
   const handleApproveTrip = (id: string) => {
@@ -46,7 +50,7 @@ export default function AdminDashboardPage() {
             Platform Administration
           </span>
           <h1 className="text-3xl font-black mt-2 font-heading">Ghurabo Control Center</h1>
-          <p className="text-xs text-slate-300">Analytics overview, content moderation, duplicate merger, & technical SEO governance.</p>
+          <p className="text-xs text-slate-300">Analytics overview, content moderation, image moderation, duplicate merger, & technical SEO governance.</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -61,7 +65,7 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Admin Tab Switcher */}
-      <div className="flex items-center gap-2 border-b border-slate-200 text-xs font-semibold">
+      <div className="flex items-center gap-2 border-b border-slate-200 text-xs font-semibold overflow-x-auto">
         <button
           onClick={() => setActiveTab('analytics')}
           className={`pb-3 px-4 border-b-2 flex items-center gap-2 transition-colors ${
@@ -75,6 +79,18 @@ export default function AdminDashboardPage() {
         </button>
 
         <button
+          onClick={() => setActiveTab('photos')}
+          className={`pb-3 px-4 border-b-2 flex items-center gap-2 transition-colors ${
+            activeTab === 'photos'
+              ? 'border-brand-purple text-brand-purple font-bold'
+              : 'border-transparent text-slate-500 hover:text-slate-800'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4 text-brand-purple" />
+          <span>Photo Moderation Queue</span>
+        </button>
+
+        <button
           onClick={() => setActiveTab('moderation')}
           className={`pb-3 px-4 border-b-2 flex items-center gap-2 transition-colors ${
             activeTab === 'moderation'
@@ -82,8 +98,8 @@ export default function AdminDashboardPage() {
               : 'border-transparent text-slate-500 hover:text-slate-800'
           }`}
         >
-          <ShieldAlert className="w-4 h-4" />
-          <span>Content Moderation ({pendingTrips.length})</span>
+          <FileText className="w-4 h-4" />
+          <span>Trip Moderation ({pendingTrips.length})</span>
         </button>
 
         <button
@@ -101,6 +117,9 @@ export default function AdminDashboardPage() {
 
       {/* TAB 1: ANALYTICS OVERVIEW */}
       {activeTab === 'analytics' && <AnalyticsOverview />}
+
+      {/* TAB 2: PHOTO MODERATION */}
+      {activeTab === 'photos' && <ImageModeration />}
 
       {/* TAB 2: CONTENT MODERATION */}
       {activeTab === 'moderation' && (

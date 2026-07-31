@@ -110,6 +110,14 @@ export const Header: React.FC = () => {
                     <span>Popular Destinations</span>
                   </Link>
 
+                  <Link
+                    href="/gallery"
+                    className="flex items-center gap-2.5 p-2 rounded-lg hover:bg-slate-50 text-slate-800 font-medium text-xs"
+                  >
+                    <Sparkles className="w-4 h-4 text-brand-purple" />
+                    <span>Travel Photo Gallery</span>
+                  </Link>
+
                   <div className="my-1 border-t border-slate-100" />
 
                   <div className="px-3 py-1 text-[10px] font-bold uppercase text-slate-400 tracking-wider">
@@ -130,6 +138,18 @@ export const Header: React.FC = () => {
                 </div>
               )}
             </div>
+
+            <Link
+              href="/gallery"
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg whitespace-nowrap transition-colors ${
+                isActive('/gallery')
+                  ? 'bg-slate-100 text-brand-purple font-bold'
+                  : 'hover:bg-slate-50 hover:text-slate-900'
+              }`}
+            >
+              <Sparkles className="w-4 h-4 text-slate-400 shrink-0" />
+              <span>Gallery</span>
+            </Link>
 
             <Link
               href="/budget-trips"

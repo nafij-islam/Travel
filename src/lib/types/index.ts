@@ -1,4 +1,5 @@
 // Jatrio TypeScript Interfaces & Schema Definitions
+export * from './database.types';
 
 export type Locale = 'en' | 'bn';
 
@@ -10,7 +11,8 @@ export type UserRole =
   | 'operator'
   | 'resort_owner'
   | 'moderator'
-  | 'admin';
+  | 'admin'
+  | 'super_admin';
 
 export interface UserProfile {
   id: string;
@@ -26,8 +28,20 @@ export interface UserProfile {
   followersCount: number;
   followingCount: number;
   isVerified: boolean;
-  badges: string[];
+  badges?: string[];
   createdAt: string;
+  roles?: UserRole[];
+}
+
+export interface UserSettings {
+  id: string;
+  userId: string;
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  defaultCurrency: string;
+  language: Locale;
+  theme: string;
+  updatedAt: string;
 }
 
 export interface TravelStyle {
@@ -101,6 +115,35 @@ export interface TripCostConfirmationStats {
   lastConfirmedDate: string;
 }
 
+export interface TripImage {
+  id: string;
+  tripId: string;
+  uploadedBy: string;
+  storagePath: string;
+  originalFilename: string;
+  caption?: string;
+  altText?: string;
+  isCover: boolean;
+  sortOrder: number;
+  visibility: 'public' | 'private' | 'unlisted';
+  moderationStatus: 'pending' | 'approved' | 'rejected';
+  fileSize: number;
+  width?: number;
+  height?: number;
+  createdAt: string;
+  updatedAt: string;
+  previewUrl?: string;
+  uploaderName?: string;
+  uploaderAvatar?: string;
+  destinationName?: string;
+  tripTitle?: string;
+  tripSlug?: string;
+  tripDate?: string;
+  travelStyleSlug?: string;
+  reportsCount?: number;
+  moderationNotes?: string;
+}
+
 export interface Trip {
   id: string;
   authorId: string;
@@ -121,6 +164,7 @@ export interface Trip {
   currency: string;
   coverImagePath: string;
   images: string[];
+  tripImages?: TripImage[];
   transportSegments: TransportSegment[];
   accommodations: AccommodationRecord[];
   expenses: ExpenseItem[];
@@ -196,6 +240,78 @@ export interface PackingItem {
   name: string;
   isPacked: boolean;
   assignedTo?: string;
+}
+
+export interface Achievement {
+  id: string;
+  titleEn: string;
+  titleBn: string;
+  descriptionEn: string;
+  descriptionBn: string;
+  badgeIcon: string;
+  category: string;
+  progress: number; // 0 to 100
+  isUnlocked: boolean;
+}
+
+export interface ContentReport {
+  id: string;
+  reporterId: string;
+  contentType: 'trip' | 'trip_image' | 'question' | 'answer' | 'comment';
+  contentId: string;
+  reason: string;
+  status: 'pending' | 'reviewed' | 'dismissed';
+  createdAt: string;
+}
+
+export interface ModerationAction {
+  id: string;
+  moderatorId: string;
+  actionType: string;
+  targetType: string;
+  targetId: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface AuditLog {
+  id: string;
+  userId?: string;
+  action: string;
+  entityType: string;
+  entityId?: string;
+  payload?: Record<string, any>;
+  ipAddress?: string;
+  createdAt: string;
+}
+
+export interface NotificationItem {
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  link?: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface CommentItem {
+  id: string;
+  targetType: 'trip' | 'question' | 'answer';
+  targetId: string;
+  authorId: string;
+  author?: UserProfile;
+  content: string;
+  parentId?: string;
+  createdAt: string;
+}
+
+export interface UserFollow {
+  id: string;
+  followerId: string;
+  followingId: string;
+  createdAt: string;
 }
 
 export interface Achievement {

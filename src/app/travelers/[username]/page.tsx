@@ -87,7 +87,7 @@ export default function TravelerProfilePage({ params }: TravelerPageProps) {
               <p className="text-xs text-slate-600 max-w-xl leading-relaxed">{user.bio}</p>
 
               <div className="flex flex-wrap gap-2 pt-1">
-                {user.badges.map((b, idx) => (
+                {(user.badges || []).map((b, idx) => (
                   <span key={idx} className="px-3 py-1 rounded-full bg-brand-cyan/40 text-slate-800 font-bold text-[10px] border border-brand-cyan/60">
                     🏆 {b}
                   </span>
