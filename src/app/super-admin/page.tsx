@@ -19,13 +19,16 @@ export default async function SuperAdminPage() {
   }
 
   // Server-side verification of super_admin or admin role
+  const isOwnerEmail = session.user.email?.toLowerCase() === 'sahariannafis70@gmail.com';
+  const isMetadataAdmin = session.user.user_metadata?.role === 'super_admin' || session.user.user_metadata?.role === 'admin';
+
   const { data: roles } = await supabase
     .from('user_roles')
     .select('role')
     .eq('user_id', session.user.id)
     .in('role', ['super_admin', 'admin']);
 
-  const isSuperAdmin = roles && roles.length > 0;
+  const isSuperAdmin = isOwnerEmail || isMetadataAdmin || (roles && roles.length > 0);
 
   if (!isSuperAdmin) {
     return (
