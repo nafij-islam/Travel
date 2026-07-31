@@ -1,9 +1,8 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { AnalyticsOverview } from '@/components/admin/analytics/AnalyticsOverview';
-import { MOCK_DESTINATIONS, MOCK_TRIPS } from '@/lib/data/mockData';
 import {
   ShieldAlert,
   Merge,
@@ -13,30 +12,68 @@ import {
   AlertTriangle,
   Globe,
   BarChart2,
-  ArrowRight
+  ArrowRight,
+  Inbox
 } from 'lucide-react';
 
 import { ImageModeration } from '@/components/admin/ImageModeration';
-import { mergeDuplicateDestinations } from '@/lib/supabase/supabase';
+import { mergeDuplicateDestinations, supabase } from '@/lib/supabase/supabase';
 
 export default function AdminDashboardPage() {
   const [activeTab, setActiveTab] = useState<'analytics' | 'moderation' | 'photos' | 'duplicates'>('analytics');
-  const [duplicateDestinations, setDuplicateDestinations] = useState([
-    { id: 'dup-1', primaryName: 'Sajek Valley', duplicateName: 'Sajek Vally', district: 'Rangamati', tripCount: 48 },
-    { id: 'dup-2', primaryName: 'Cox\'s Bazar', duplicateName: 'Coxsbazar', district: 'Cox\'s Bazar', tripCount: 120 }
-  ]);
+  
+  // Real Supabase Queues
+  const [pendingTrips, setPendingTrips] = useState<any[]>([]);
+  const [duplicateDestinations, setDuplicateDestinations] = useState<any[]>([]);
+  const [loadingPending, setLoadingPending] = useState(true);
 
-  const [pendingTrips, setPendingTrips] = useState([
-    { id: 'p-1', title: 'Bandarban Nilgiri 2 Days Trip Report', author: 'Tanvir Hossain', status: 'Pending Review' }
-  ]);
+  useEffect(() => {
+    async function loadAdminQueues() {
+      if (!supabase) {
+        setLoadingPending(false);
+        return;
+      }
+      try {
+        // Fetch Pending Trips awaiting moderation
+        const { data: tripsData } = await supabase
+          .from('trips')
+          .select(`*, author:profiles(*)`)
+          .eq('publication_status', 'pending_review')
+          .order('created_at', { ascending: false });
 
-  const handleMerge = async (id: string) => {
-    await mergeDuplicateDestinations('dest-1', id);
+        if (tripsData) {
+          setPendingTrips(
+            tripsData.map((t: any) => ({
+              id: t.id,
+              title: t.title,
+              author: t.author?.full_name || 'Traveler',
+              status: 'Pending Review',
+              createdAt: t.created_at
+            }))
+          );
+        }
+      } catch (err) {
+        console.error('Error loading admin moderation queues:', err);
+      } finally {
+        setLoadingPending(false);
+      }
+    }
+    loadAdminQueues();
+  }, []);
+
+  const handleMerge = async (id: string, primaryName: string) => {
+    await mergeDuplicateDestinations(primaryName, id);
     setDuplicateDestinations(duplicateDestinations.filter((d) => d.id !== id));
-    alert('Duplicate destination successfully merged into primary record in Supabase!');
+    alert('Duplicate destination merged in Supabase!');
   };
 
-  const handleApproveTrip = (id: string) => {
+  const handleApproveTrip = async (id: string) => {
+    if (supabase) {
+      await supabase
+        .from('trips')
+        .update({ publication_status: 'published', published_at: new Date().toISOString() })
+        .eq('id', id);
+    }
     setPendingTrips(pendingTrips.filter((p) => p.id !== id));
     alert('Trip approved and published live on Ghurabo!');
   };
@@ -65,13 +102,13 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Admin Tab Switcher */}
-      <div className="flex items-center gap-2 border-b border-slate-200 text-xs font-semibold overflow-x-auto">
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold overflow-x-auto">
         <button
           onClick={() => setActiveTab('analytics')}
           className={`pb-3 px-4 border-b-2 flex items-center gap-2 transition-colors ${
             activeTab === 'analytics'
               ? 'border-brand-purple text-brand-purple font-bold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           <BarChart2 className="w-4 h-4" />
@@ -83,7 +120,7 @@ export default function AdminDashboardPage() {
           className={`pb-3 px-4 border-b-2 flex items-center gap-2 transition-colors ${
             activeTab === 'photos'
               ? 'border-brand-purple text-brand-purple font-bold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           <ShieldAlert className="w-4 h-4 text-brand-purple" />
@@ -95,7 +132,7 @@ export default function AdminDashboardPage() {
           className={`pb-3 px-4 border-b-2 flex items-center gap-2 transition-colors ${
             activeTab === 'moderation'
               ? 'border-brand-purple text-brand-purple font-bold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           <FileText className="w-4 h-4" />
@@ -107,7 +144,7 @@ export default function AdminDashboardPage() {
           className={`pb-3 px-4 border-b-2 flex items-center gap-2 transition-colors ${
             activeTab === 'duplicates'
               ? 'border-brand-purple text-brand-purple font-bold'
-              : 'border-transparent text-slate-500 hover:text-slate-800'
+              : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
           }`}
         >
           <Merge className="w-4 h-4" />
@@ -115,74 +152,97 @@ export default function AdminDashboardPage() {
         </button>
       </div>
 
-      {/* TAB 1: ANALYTICS OVERVIEW */}
+      {/* TAB CONTENT: ANALYTICS */}
       {activeTab === 'analytics' && <AnalyticsOverview />}
 
-      {/* TAB 2: PHOTO MODERATION */}
+      {/* TAB CONTENT: PHOTO MODERATION */}
       {activeTab === 'photos' && <ImageModeration />}
 
-      {/* TAB 2: CONTENT MODERATION */}
+      {/* TAB CONTENT: TRIP MODERATION */}
       {activeTab === 'moderation' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
-          <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 font-heading">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
+          <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading flex items-center gap-2">
             <ShieldAlert className="w-5 h-5 text-brand-purple" />
             <span>Pending Content Moderation Queue</span>
-          </h3>
+          </h2>
 
-          {pendingTrips.length > 0 ? (
+          {loadingPending ? (
+            <div className="text-center py-12 text-xs text-slate-400">Loading moderation queue...</div>
+          ) : pendingTrips.length > 0 ? (
             <div className="space-y-3">
-              {pendingTrips.map((p) => (
-                <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs gap-3">
+              {pendingTrips.map((trip) => (
+                <div
+                  key={trip.id}
+                  className="p-4 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
+                >
                   <div>
-                    <div className="font-bold text-slate-900 text-sm font-heading">{p.title}</div>
-                    <div className="text-slate-500">Submitted by @{p.author}</div>
+                    <div className="text-sm font-bold text-slate-900 dark:text-white font-heading">{trip.title}</div>
+                    <div className="text-xs text-slate-500">Submitted by @{trip.author}</div>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleApproveTrip(p.id)}
-                      className="px-4 py-2 rounded-lg bg-brand-purple text-white font-semibold text-xs flex items-center gap-1 shadow-sm"
-                    >
-                      <CheckCircle2 className="w-4 h-4" /> Approve & Publish
-                    </button>
-                  </div>
+
+                  <button
+                    onClick={() => handleApproveTrip(trip.id)}
+                    className="px-4 py-2 rounded-xl bg-brand-purple text-white text-xs font-bold shadow-sm hover:bg-brand-purple/90 shrink-0 flex items-center gap-1.5"
+                  >
+                    <CheckCircle2 className="w-4 h-4 text-brand-cyan" />
+                    <span>Approve & Publish</span>
+                  </button>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-xs text-slate-400 italic">No pending items in moderation queue.</div>
+            <div className="text-center py-12 text-xs text-slate-500 dark:text-slate-400 space-y-2">
+              <Inbox className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto" />
+              <div className="font-bold text-slate-800 dark:text-white">No Trips Awaiting Moderation</div>
+              <p>All user trip reports have been reviewed and published.</p>
+            </div>
           )}
         </div>
       )}
 
-      {/* TAB 3: DUPLICATE DESTINATIONS MERGER */}
+      {/* TAB CONTENT: DUPLICATE DESTINATIONS MERGER */}
       {activeTab === 'duplicates' && (
-        <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm space-y-4">
-          <h3 className="text-lg font-black text-slate-900 flex items-center gap-2 font-heading">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-2xs space-y-4">
+          <h2 className="text-base font-bold text-slate-900 dark:text-white font-heading flex items-center gap-2">
             <Merge className="w-5 h-5 text-brand-purple" />
             <span>Duplicate Destination Auto-Detection & Merger</span>
-          </h3>
-          <p className="text-xs text-slate-500">
+          </h2>
+          <p className="text-xs text-slate-500 dark:text-slate-400">
             Destinations submitted by users with typo variations or alternate spellings are flagged below. Safe merge preserves existing public trip URLs.
           </p>
 
-          <div className="space-y-3">
-            {duplicateDestinations.map((dup) => (
-              <div key={dup.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-amber-50/60 border border-amber-200 text-xs gap-3">
-                <div>
-                  <div className="font-bold text-slate-900">
-                    Primary: <span className="text-brand-purple">{dup.primaryName}</span> ↔ Flagged Duplicate: <span className="text-rose-600 font-bold">{dup.duplicateName}</span>
-                  </div>
-                  <div className="text-slate-500">{dup.district} District · {dup.tripCount} Linked Trips</div>
-                </div>
-                <button
-                  onClick={() => handleMerge(dup.id)}
-                  className="px-4 py-2 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs flex items-center gap-1 shadow-sm shrink-0"
+          {duplicateDestinations.length > 0 ? (
+            <div className="space-y-3">
+              {duplicateDestinations.map((dest) => (
+                <div
+                  key={dest.id}
+                  className="p-4 rounded-xl bg-amber-500/5 border border-amber-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3"
                 >
-                  <Merge className="w-4 h-4 text-brand-cyan" /> Merge Safely
-                </button>
-              </div>
-            ))}
-          </div>
+                  <div>
+                    <div className="text-xs font-bold text-slate-900 dark:text-white">
+                      Primary: <span className="text-brand-purple">{dest.primaryName}</span> ↔ Flagged Duplicate: <span className="text-rose-600">{dest.duplicateName}</span>
+                    </div>
+                    <div className="text-[11px] text-slate-500">
+                      {dest.district} District · {dest.tripCount} Linked Trips
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => handleMerge(dest.id, dest.primaryName)}
+                    className="px-4 py-2 rounded-xl bg-slate-900 dark:bg-slate-800 text-white text-xs font-bold shadow-sm hover:bg-slate-800 shrink-0"
+                  >
+                    Merge Safely
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-12 text-xs text-slate-500 dark:text-slate-400 space-y-2">
+              <CheckCircle2 className="w-10 h-10 text-emerald-500 mx-auto" />
+              <div className="font-bold text-slate-800 dark:text-white">No Duplicate Destinations Flagged</div>
+              <p>All user destination entries are clean and merged.</p>
+            </div>
+          )}
         </div>
       )}
     </div>
