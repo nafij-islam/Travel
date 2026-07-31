@@ -688,7 +688,7 @@ CREATE POLICY "Public Read Published Trips" ON public.trips
         OR auth.uid() = author_id 
         OR EXISTS (
             SELECT 1 FROM public.user_roles 
-            WHERE user_id = auth.uid() AND role IN ('super_admin', 'admin')
+            WHERE user_id = auth.uid() AND role::text IN ('super_admin', 'admin', 'moderator')
         )
     );
 
@@ -702,7 +702,7 @@ CREATE POLICY "Author Update Own Trip" ON public.trips
         auth.uid() = author_id 
         OR EXISTS (
             SELECT 1 FROM public.user_roles 
-            WHERE user_id = auth.uid() AND role IN ('super_admin', 'admin')
+            WHERE user_id = auth.uid() AND role::text IN ('super_admin', 'admin', 'moderator')
         )
     );
 
@@ -731,7 +731,7 @@ CREATE POLICY "Public Read Approved Trip Images" ON public.trip_images
         OR auth.uid() = uploaded_by 
         OR EXISTS (
             SELECT 1 FROM public.user_roles 
-            WHERE user_id = auth.uid() AND role IN ('super_admin', 'admin')
+            WHERE user_id = auth.uid() AND role::text IN ('super_admin', 'admin', 'moderator')
         )
     );
 
@@ -745,7 +745,7 @@ CREATE POLICY "Admin Update Trip Images" ON public.trip_images
         auth.uid() = uploaded_by 
         OR EXISTS (
             SELECT 1 FROM public.user_roles 
-            WHERE user_id = auth.uid() AND role IN ('super_admin', 'admin')
+            WHERE user_id = auth.uid() AND role::text IN ('super_admin', 'admin', 'moderator')
         )
     );
 
